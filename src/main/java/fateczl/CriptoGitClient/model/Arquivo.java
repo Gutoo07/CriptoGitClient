@@ -12,7 +12,6 @@ public class Arquivo {
         this.blob = blob;
     }
     
-
     public String getName() {
         return name;
     }

@@ -5,6 +5,7 @@ import java.util.Scanner;
 
 public class ConsoleService {
     private final Scanner scanner = new Scanner(System.in);
+    private RepositorioService repositorioService = new RepositorioService();
 
     public void run() {
         String command;
@@ -13,10 +14,14 @@ public class ConsoleService {
             command = readCommand();
             switch (command) {
                 case "init":
-                    RepositorioService repositorioService = new RepositorioService();
-                    System.out.println("Digite o caminho do repositório:");
+                    System.out.print("Digite o caminho do repositório: ");
                     String path = scanner.nextLine();
                     repositorioService.init(path);
+                    break;
+                case "add":
+                    System.out.print("Digite o nome do arquivo ou '.' para adicionar todos: ");
+                    String filename = scanner.nextLine();
+                    repositorioService.add(filename);
                     break;
                 case "exit":
                     System.out.println("Saindo...");
@@ -32,7 +37,7 @@ public class ConsoleService {
     }
 
     public String readCommand() {
-        System.out.println("Digite um comando:");
+        System.out.print("Digite um comando: ");
         return scanner.nextLine(); 
     }
 

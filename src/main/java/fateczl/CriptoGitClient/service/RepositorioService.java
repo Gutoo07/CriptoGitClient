@@ -1,5 +1,7 @@
 package fateczl.CriptoGitClient.service;
 
+import fateczl.CriptoGitClient.model.Arquivo;
+import fateczl.CriptoGitClient.model.Tree;
 import fateczl.CriptoGitClient.model.Repositorio;
 import fateczl.CriptoGitClient.model.Blob;
 import java.nio.file.Files;
@@ -9,6 +11,7 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.ArrayList;
 
 public class RepositorioService {
     private Repositorio repositorio;
@@ -52,14 +55,82 @@ public class RepositorioService {
             }
         }
         
-        System.out.println("Repositório inicializado com sucesso: " + repositorio.getName());
-        System.out.println("Criando os objects...");
-        try {
-            generateObjects(path);
-        } catch (IOException | NoSuchAlgorithmException e) {
-            throw new IOException("Erro ao criar os objects: " + e.getMessage());
+        System.out.println("Repositório inicializado com sucesso: " + repositorio.getName());       
+    }
+
+    public void add (String filename) throws Exception {
+        // Se o usuário fizer 'add .', cria o objeto de todos os arquivos e diretórios do repositório
+        if (filename.equals(".")) {
+            try {
+                generateObjects(repositorio.getPath());
+            } catch (Exception e) {
+                throw new Exception("Erro ao criar os objects: " + e.getMessage());
+            }
+        } else {
+            // Se o usuário fizer 'add <filename>', cria o blob do arquivo e as trees dos diretórios pais
+            try {
+                addSpecificFile(filename);
+            } catch (Exception e) {
+                throw new Exception("Erro ao criar o object: " + e.getMessage());
+            }
         }
     }
+    
+    private void addSpecificFile(String filename) throws Exception {
+        Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
+        
+        // Procura o arquivo em toda a estrutura de diretórios
+        Path filePath = findFileInRepository(filename);
+        
+        if (filePath == null) {
+            throw new IOException("Arquivo não encontrado: " + filename);
+        }
+        
+        if (!Files.isRegularFile(filePath)) {
+            throw new IOException("O caminho especificado não é um arquivo: " + filename);
+        }
+        
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        
+        // 1. Cria o blob do arquivo
+        Arquivo arquivo = processFile(filePath, objectsPath, md);
+        System.out.println("Arquivo adicionado: " + arquivo.getName());
+        
+        // 2. TODO: Reconstrói as trees dos diretórios pais
+    }
+    
+    private Path findFileInRepository(String filename) throws IOException {
+        Path repoRoot = Paths.get(repositorio.getPath());
+        return findFileRecursively(repoRoot, filename);
+    }
+    
+    private Path findFileRecursively(Path currentPath, String filename) throws IOException {
+        // Lista todos os itens do diretório atual
+        try (var stream = Files.list(currentPath)) {
+            for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
+                // Ignora o diretório .criptogit
+                if (item.toString().contains(".criptogit")) {
+                    continue;
+                }
+                
+                if (Files.isDirectory(item)) {
+                    // Se é um diretório, busca recursivamente
+                    Path found = findFileRecursively(item, filename);
+                    if (found != null) {
+                        return found;
+                    }
+                } else if (Files.isRegularFile(item)) {
+                    // Se é um arquivo, verifica se o nome corresponde
+                    if (item.getFileName().toString().equals(filename)) {
+                        return item;
+                    }
+                }
+            }
+        }
+        return null; // Arquivo não encontrado neste diretório
+    }
+    
+
 
     public void generateObjects(String path) throws Exception {
         // Cria os objects de um diretório com .criptogit
@@ -75,50 +146,124 @@ public class RepositorioService {
             System.out.println("Criando o diretório objects...");
             Files.createDirectory(objectsPath);
         }
-        // Cria os objects de todos os arquivos do diretório, exceto .criptogit
+        
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
-            
-            // Usa Stream para coletar os arquivos em uma lista
-            List<Path> files = Files.walk(Paths.get(path))
-                .filter(Files::isRegularFile)
-                .filter(file -> !file.toString().contains(".criptogit"))
-                .collect(java.util.stream.Collectors.toList());
-            
-            // Loop tradicional para processar cada arquivo
-            for (Path file : files) {
-                String separator = System.getProperty("file.separator");
-                String name = file.toString().substring(file.toString().lastIndexOf(separator) + 1);
-                System.out.println("Criando o object do arquivo: " + name);         
-
-                // Pega o conteúdo do arquivo e cria um objeto Blob
-                Blob blob = new Blob();
-                blob.setContent(Files.readAllBytes(file));
-
-                // Faz a hash SHA-1 do conteúdo do arquivo                
-                byte[] sha1bytes = md.digest(blob.getContent());
-                StringBuilder sb = new StringBuilder();
-                for (byte b : sha1bytes) {
-                    sb.append(String.format("%02x", b));
-                }
-                blob.setHash(sb.toString());
-
-                // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
-                String hash = blob.getHash();
-                String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
-                String fileName = hash.substring(2);         // 38 caracteres restantes
-                
-                // Cria o diretório com os 2 primeiros caracteres
-                Path objectDir = Paths.get(objectsPath.toString(), dirName);
-                Files.createDirectories(objectDir);
-                
-                // Cria o arquivo com os 38 caracteres restantes
-                Path objectFile = Paths.get(objectDir.toString(), fileName);
-                Files.write(objectFile, blob.getContent());
-            }
+            // Inicia o processamento recursivo
+            processDirectoryRecursively(Paths.get(path), objectsPath, md);
         } catch (IOException | NoSuchAlgorithmException e) {            
             throw new Exception("Erro ao processar arquivos: " + e.getMessage());
         }
         System.out.println("Objects criados com sucesso.");
+    }
+    
+    // Sobrecarga do método - versão sem Tree (para uso externo)
+    private void processDirectoryRecursively(Path currentPath, Path objectsPath, MessageDigest md) throws IOException {
+        processDirectoryRecursively(currentPath, objectsPath, md, null);
+    }
+    
+    // Método principal com Tree
+    private void processDirectoryRecursively(Path currentPath, Path objectsPath, MessageDigest md, Tree parentTree) throws IOException {
+        // Lista todos os itens do diretório atual
+        try (var stream = Files.list(currentPath)) {
+            // Cria uma nova Tree para o diretório atual
+            Tree currentTree = new Tree();               
+            currentTree.setName(currentPath.getFileName().toString());
+            System.out.println("Processando diretório: " + currentTree.getName());
+            
+            // Processa cada arquivo e diretório do diretório atual
+            for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
+                // Ignora o diretório .criptogit
+                if (item.toString().contains(".criptogit")) {
+                    continue;
+                }
+                
+                if (Files.isDirectory(item)) {
+                    // Se é um diretório, processa recursivamente
+                    System.out.println("Processando subdiretório: " + item.getFileName());
+                    processDirectoryRecursively(item, objectsPath, md, currentTree);
+                } else if (Files.isRegularFile(item)) {
+                    // Se é um arquivo, cria o blob
+                    Arquivo file = processFile(item, objectsPath, md);
+                    currentTree.addArquivo(file);
+                }
+            }
+            // Depois de montada uma Tree, monta um blob e salva no diretório objects
+            // Para cada arquivo e tree da Tree atual, escreve seu nome e sua hash no blob
+            StringBuilder blobContent = new StringBuilder();
+            for (Arquivo arquivo : currentTree.getArquivos()) {
+                blobContent.append("blob ").append(arquivo.getName()).append(" ").append(arquivo.getBlob().getHash()).append("\n");
+            }
+            for (Tree tree : currentTree.getTrees()) {
+                blobContent.append("tree ").append(tree.getName()).append(" ").append(tree.getHash()).append("\n");
+            }
+            
+            // Faz a hash SHA-1 do conteúdo do blob
+            byte[] sha1bytes = md.digest(blobContent.toString().getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : sha1bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            currentTree.setHash(sb.toString());
+            
+            // Salva o blob no diretório objects
+            Blob treeBlob = new Blob();
+            treeBlob.setContent(blobContent.toString().getBytes());
+            treeBlob.setHash(currentTree.getHash());
+            
+            // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+            String hash = currentTree.getHash();
+            String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
+            String fileName = hash.substring(2);         // 38 caracteres restantes
+            
+            // Cria o diretório com os 2 primeiros caracteres
+            Path objectDir = Paths.get(objectsPath.toString(), dirName);
+            Files.createDirectories(objectDir);
+            
+            // Cria o arquivo com os 38 caracteres restantes
+            Path objectFile = Paths.get(objectDir.toString(), fileName);
+            Files.write(objectFile, treeBlob.getContent());
+            
+            // Se há um parentTree, adiciona a currentTree como filha
+            if (parentTree != null) {
+                parentTree.addTree(currentTree);
+            }
+        }
+    }
+    
+    private Arquivo processFile(Path file, Path objectsPath, MessageDigest md) throws IOException {
+        String separator = System.getProperty("file.separator");
+        String name = file.toString().substring(file.toString().lastIndexOf(separator) + 1);
+        System.out.println("Criando o object do arquivo: " + name);         
+
+        // Pega o conteúdo do arquivo e cria um objeto Blob
+        Blob blob = new Blob();
+        blob.setContent(Files.readAllBytes(file));
+
+        // Faz a hash SHA-1 do conteúdo do arquivo                
+        byte[] sha1bytes = md.digest(blob.getContent());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : sha1bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        blob.setHash(sb.toString());
+
+        // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+        String hash = blob.getHash();
+        String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
+        String fileName = hash.substring(2);         // 38 caracteres restantes
+        
+        // Cria o diretório com os 2 primeiros caracteres
+        Path objectDir = Paths.get(objectsPath.toString(), dirName);
+        Files.createDirectories(objectDir);
+        
+        // Cria o arquivo com os 38 caracteres restantes
+        Path objectFile = Paths.get(objectDir.toString(), fileName);
+        Files.write(objectFile, blob.getContent());
+
+        Arquivo arquivo = new Arquivo();
+        arquivo.setName(name);
+        arquivo.setBlob(blob);
+        return arquivo;
     }
 }

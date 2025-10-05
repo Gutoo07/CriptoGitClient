@@ -94,9 +94,71 @@ public class RepositorioService {
         
         // 1. Cria o blob do arquivo
         Arquivo arquivo = processFile(filePath, objectsPath, md);
-        System.out.println("Arquivo adicionado: " + arquivo.getName());
         
-        // 2. TODO: Reconstrói as trees dos diretórios pais
+        // 2. Reconstrói as trees dos diretórios pais
+        // Busca o diretório pai do arquivo e monta a tree na memória
+        Path parentPath = filePath.getParent();
+        Tree tree = new Tree();
+        tree.setName(parentPath.getFileName().toString());
+        tree.addArquivo(arquivo);
+        // Processa o diretório pai do arquivo e persiste sua tree no diretório objects
+        processDirectory(parentPath, objectsPath, md, tree);
+
+        // Se o diretório pai não for o próprio repositório, processa o diretório pai
+        while (!parentPath.getFileName().toString().equals(repositorio.getName())) {
+            // Busca o diretório pai do diretório atual
+            parentPath = parentPath.getParent();
+            Tree parentTree = new Tree();
+            parentTree.setName(parentPath.getFileName().toString());
+            parentTree.addTree(tree);
+            // Processa o diretório pai e persiste sua tree no diretório objects
+            processDirectory(parentPath, objectsPath, md, parentTree);
+            tree = parentTree;
+        }
+    }
+    /**
+     * Processa um diretório e persiste sua tree no diretório objects
+     * @param directory
+     * @param objectsPath
+     * @param md
+     * @param currentTree
+     * @throws IOException
+     */
+    
+    private void processDirectory(Path directory, Path objectsPath, MessageDigest md, Tree currentTree) throws IOException {
+        StringBuilder blobContent = new StringBuilder();
+            for (Arquivo arquivo : currentTree.getArquivos()) {
+                blobContent.append("blob ").append(arquivo.getName()).append(" ").append(arquivo.getBlob().getHash()).append("\n");
+            }
+            for (Tree tree : currentTree.getTrees()) {
+                blobContent.append("tree ").append(tree.getName()).append(" ").append(tree.getHash()).append("\n");
+            }
+            
+            // Faz a hash SHA-1 do conteúdo do blob
+            byte[] sha1bytes = md.digest(blobContent.toString().getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : sha1bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            currentTree.setHash(sb.toString());
+            
+            // Salva o blob no diretório objects
+            Blob treeBlob = new Blob();
+            treeBlob.setContent(blobContent.toString().getBytes());
+            treeBlob.setHash(currentTree.getHash());
+            
+            // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+            String hash = currentTree.getHash();
+            String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
+            String fileName = hash.substring(2);         // 38 caracteres restantes
+            
+            // Cria o diretório com os 2 primeiros caracteres
+            Path objectDir = Paths.get(objectsPath.toString(), dirName);
+            Files.createDirectories(objectDir);
+            
+            // Cria o arquivo com os 38 caracteres restantes
+            Path objectFile = Paths.get(objectDir.toString(), fileName);
+            Files.write(objectFile, treeBlob.getContent());
     }
     
     private Path findFileInRepository(String filename) throws IOException {
@@ -190,39 +252,7 @@ public class RepositorioService {
             }
             // Depois de montada uma Tree, monta um blob e salva no diretório objects
             // Para cada arquivo e tree da Tree atual, escreve seu nome e sua hash no blob
-            StringBuilder blobContent = new StringBuilder();
-            for (Arquivo arquivo : currentTree.getArquivos()) {
-                blobContent.append("blob ").append(arquivo.getName()).append(" ").append(arquivo.getBlob().getHash()).append("\n");
-            }
-            for (Tree tree : currentTree.getTrees()) {
-                blobContent.append("tree ").append(tree.getName()).append(" ").append(tree.getHash()).append("\n");
-            }
-            
-            // Faz a hash SHA-1 do conteúdo do blob
-            byte[] sha1bytes = md.digest(blobContent.toString().getBytes());
-            StringBuilder sb = new StringBuilder();
-            for (byte b : sha1bytes) {
-                sb.append(String.format("%02x", b));
-            }
-            currentTree.setHash(sb.toString());
-            
-            // Salva o blob no diretório objects
-            Blob treeBlob = new Blob();
-            treeBlob.setContent(blobContent.toString().getBytes());
-            treeBlob.setHash(currentTree.getHash());
-            
-            // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
-            String hash = currentTree.getHash();
-            String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
-            String fileName = hash.substring(2);         // 38 caracteres restantes
-            
-            // Cria o diretório com os 2 primeiros caracteres
-            Path objectDir = Paths.get(objectsPath.toString(), dirName);
-            Files.createDirectories(objectDir);
-            
-            // Cria o arquivo com os 38 caracteres restantes
-            Path objectFile = Paths.get(objectDir.toString(), fileName);
-            Files.write(objectFile, treeBlob.getContent());
+            processDirectory(currentPath, objectsPath, md, currentTree);
             
             // Se há um parentTree, adiciona a currentTree como filha
             if (parentTree != null) {

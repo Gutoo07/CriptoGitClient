@@ -134,7 +134,7 @@ public class RepositorioService {
                 blobContent.append("tree ").append(tree.getName()).append(" ").append(tree.getHash()).append("\n");
             }
             
-            // Faz a hash SHA-1 do conteúdo do blob
+            // Faz a hash SHA-1 do conteúdo do blob da tree
             byte[] sha1bytes = md.digest(blobContent.toString().getBytes());
             StringBuilder sb = new StringBuilder();
             for (byte b : sha1bytes) {
@@ -142,7 +142,7 @@ public class RepositorioService {
             }
             currentTree.setHash(sb.toString());
             
-            // Salva o blob no diretório objects
+            // Define o conteúdo e a hash do blob da tree
             Blob treeBlob = new Blob();
             treeBlob.setContent(blobContent.toString().getBytes());
             treeBlob.setHash(currentTree.getHash());
@@ -151,14 +151,15 @@ public class RepositorioService {
             String hash = currentTree.getHash();
             String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
             String fileName = hash.substring(2);         // 38 caracteres restantes
-            
-            // Cria o diretório com os 2 primeiros caracteres
+
+            // Confere se a pasta existe
+            // Se não existir, cria a pasta
             Path objectDir = Paths.get(objectsPath.toString(), dirName);
-            Files.createDirectories(objectDir);
-            
-            // Cria o arquivo com os 38 caracteres restantes
+            createDirectory(objectDir);
+            // Confere se o blob existe
+            // Se não existir, cria o blob
             Path objectFile = Paths.get(objectDir.toString(), fileName);
-            Files.write(objectFile, treeBlob.getContent());
+            createFile(objectFile, treeBlob);        
     }
     
     private Path findFileInRepository(String filename) throws IOException {
@@ -262,8 +263,7 @@ public class RepositorioService {
     }
     
     private Arquivo processFile(Path file, Path objectsPath, MessageDigest md) throws IOException {
-        String separator = System.getProperty("file.separator");
-        String name = file.toString().substring(file.toString().lastIndexOf(separator) + 1);
+        String name = file.getFileName().toString();
         System.out.println("Criando o object do arquivo: " + name);         
 
         // Pega o conteúdo do arquivo e cria um objeto Blob
@@ -282,18 +282,46 @@ public class RepositorioService {
         String hash = blob.getHash();
         String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
         String fileName = hash.substring(2);         // 38 caracteres restantes
-        
-        // Cria o diretório com os 2 primeiros caracteres
-        Path objectDir = Paths.get(objectsPath.toString(), dirName);
-        Files.createDirectories(objectDir);
-        
-        // Cria o arquivo com os 38 caracteres restantes
+
+        // Confere se a pasta existe
+        // Se não existir, cria a pasta
+        Path objectDir = Paths.get(objectsPath.toString(), dirName);        
+        createDirectory(objectDir);
+        // Confere se o blob existe
+        // Se não existir, cria o blob
         Path objectFile = Paths.get(objectDir.toString(), fileName);
-        Files.write(objectFile, blob.getContent());
+        createFile(objectFile, blob);
 
         Arquivo arquivo = new Arquivo();
         arquivo.setName(name);
         arquivo.setBlob(blob);
         return arquivo;
+    }
+    /**
+     * Cria uma pasta no diretório objects
+     * @param objectDir
+     * @throws IOException
+     */
+    public void createDirectory(Path objectDir) throws IOException {
+        // Confere se a pasta da tree existe
+        // Se não existir, cria a pasta
+        if (!Files.exists(objectDir)) {
+            System.out.println("Criando a pasta: objects/" + objectDir.getFileName().toString());
+            Files.createDirectory(objectDir);
+        }
+    }
+    /**
+     * Cria um arquivo no diretório objects
+     * @param objectFile
+     * @param blob
+     * @throws IOException
+     */
+    public void createFile(Path objectFile, Blob blob) throws IOException {
+        // Confere se o blob do arquivo existe
+        // Se não existir, cria o blob
+        if (!Files.exists(objectFile)) {
+            System.out.println("Criando o object: " + objectFile.getFileName().toString());
+            Files.write(objectFile, blob.getContent());
+        }
     }
 }

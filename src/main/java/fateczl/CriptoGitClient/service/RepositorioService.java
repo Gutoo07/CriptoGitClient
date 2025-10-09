@@ -4,6 +4,7 @@ import fateczl.CriptoGitClient.model.Arquivo;
 import fateczl.CriptoGitClient.model.Tree;
 import fateczl.CriptoGitClient.model.Repositorio;
 import fateczl.CriptoGitClient.model.Blob;
+import fateczl.CriptoGitClient.model.SubTree.Index;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 
 public class RepositorioService {
     private Repositorio repositorio;
+    private Index index;
 
     public void init(String path) throws Exception {
         // Remove aspas duplas do início e fim do caminho se existirem
@@ -47,12 +49,37 @@ public class RepositorioService {
         if (!Files.exists(criptogitPath)) {
             try {
                 Files.createDirectory(criptogitPath);
-                // Cria o diretório objects dentro do .criptogit
-                Path objectsPath = Paths.get(path, ".criptogit", "objects");                
-                Files.createDirectory(objectsPath);                
+                           
             } catch (IOException e) {
                 throw new IOException("Erro ao criar o diretório .criptogit.");
             }
+        }
+        // Cria o diretório objects dentro do .criptogit se não existir
+        Path objectsPath = Paths.get(path, ".criptogit", "objects");            
+        if (!Files.exists(objectsPath)) {
+            try {
+            Files.createDirectory(objectsPath);     
+            } catch (IOException e) {
+                throw new IOException("Erro ao criar o diretório objects.");
+            }
+        }
+
+        // Cria o arquivo index se não existir
+        Path indexPath = Paths.get(path, ".criptogit", "index");
+        index = new Index();
+        if (!Files.exists(indexPath)) {
+            Files.write(indexPath, new byte[0]);
+        } else {
+            // Se o arquivo index existir, lê todas as linhas e cria uma lista de blobs para usar em memória
+            List<String> indexBlobs = Files.readAllLines(indexPath);
+            List<Blob> blobs = new ArrayList<>();
+            for (String indexBlob : indexBlobs) {
+                Blob blob = new Blob();
+                blob.setHash(indexBlob.split(" ")[0]);
+                blob.setRelativePath(indexBlob.split(" ")[1]);
+                blobs.add(blob);                
+            }
+            index.setBlobs(blobs);
         }
         
         System.out.println("Repositório inicializado com sucesso: " + repositorio.getName());       
@@ -75,26 +102,36 @@ public class RepositorioService {
             }
         }
     }
+
+    /**
+     * Procura o arquivo no diretório e cria o blob do arquivo
+     * @param filename
+     * @throws Exception
+     */
     
     private void addSpecificFile(String filename) throws Exception {
+        // Pega o caminho do diretório objects
         Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
         
         // Procura o arquivo em toda a estrutura de diretórios
         Path filePath = findFileInRepository(filename);
         
+        // Se o arquivo não for encontrado, lança uma exceção
         if (filePath == null) {
             throw new IOException("Arquivo não encontrado: " + filename);
         }
         
+        // Se o caminho especificado não for um arquivo, lança uma exceção
         if (!Files.isRegularFile(filePath)) {
             throw new IOException("O caminho especificado não é um arquivo: " + filename);
         }
         
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         
-        // 1. Cria o blob do arquivo
-        Arquivo arquivo = processFile(filePath, objectsPath, md);
+        // Cria o blob do arquivo e adiciona ao index
+        processFile(filePath, objectsPath, md);      
         
+        /*        
         // 2. Reconstrói as trees dos diretórios pais
         // Busca o diretório pai do arquivo e monta a tree na memória
         Path parentPath = filePath.getParent();
@@ -115,6 +152,7 @@ public class RepositorioService {
             processDirectory(parentPath, objectsPath, md, parentTree);
             tree = parentTree;
         }
+        */
     }
     /**
      * Processa um diretório e persiste sua tree no diretório objects
@@ -160,6 +198,7 @@ public class RepositorioService {
             // Se não existir, cria o blob
             Path objectFile = Paths.get(objectDir.toString(), fileName);
             createFile(objectFile, treeBlob);        
+            //this.index.addBlob(treeBlob, repositorio.getPath());
     }
     
     private Path findFileInRepository(String filename) throws IOException {
@@ -237,7 +276,7 @@ public class RepositorioService {
             // Processa cada arquivo e diretório do diretório atual
             for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
                 // Ignora o diretório .criptogit
-                if (item.toString().contains(".criptogit")) {
+                if (item.toString().contains("\\.")) {
                     continue;
                 }
                 
@@ -295,6 +334,7 @@ public class RepositorioService {
         Arquivo arquivo = new Arquivo();
         arquivo.setName(name);
         arquivo.setBlob(blob);
+        this.index.addBlob(arquivo.getBlob(), repositorio.getPath(), file.toString());
         return arquivo;
     }
     /**

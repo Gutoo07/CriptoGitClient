@@ -4,6 +4,7 @@ import fateczl.CriptoGitClient.model.Arquivo;
 import fateczl.CriptoGitClient.model.Tree;
 import fateczl.CriptoGitClient.model.Repositorio;
 import fateczl.CriptoGitClient.model.Blob;
+import fateczl.CriptoGitClient.model.Commit;
 import fateczl.CriptoGitClient.model.SubTree.Index;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Date;
 
 public class RepositorioService {
     private Repositorio repositorio;
@@ -74,6 +76,10 @@ public class RepositorioService {
             List<String> indexBlobs = Files.readAllLines(indexPath);
             List<Blob> blobs = new ArrayList<>();
             for (String indexBlob : indexBlobs) {
+                // Ignora linhas vazias
+                if (indexBlob.isEmpty()) {
+                    continue;
+                }
                 Blob blob = new Blob();
                 blob.setHash(indexBlob.split(" ")[0]);
                 blob.setRelativePath(indexBlob.split(" ")[1]);
@@ -231,8 +237,95 @@ public class RepositorioService {
         }
         return null; // Arquivo não encontrado neste diretório
     }
-    
 
+    /*
+     * Cria as trees necessarias para o commit, incluindo a tree raiz
+     * Ainda falta criar o object do commit em si, que guardará os metadados no objeto commit
+     * e apontará para a tree raiz
+     * @param message
+     * @throws Exception
+     */
+    
+    public void commit(String message) throws Exception {
+        // Cria o objeto de commit com os metadados
+        Commit commit = new Commit();
+        commit.setMessage(message);
+        commit.setDate(new Date().toString());
+        commit.setAuthor(System.getProperty("user.name"));
+        
+        // Verifica se o diretório .criptogit existe
+        if (!Files.exists(Paths.get(repositorio.getPath(), ".criptogit"))) {
+            throw new IOException("Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
+        }
+        // Verifica se o diretório objects existe
+        Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
+        if (!Files.exists(objectsPath)) {            
+            throw new IOException("Diretório objects não existe. Execute o comando init para criar um repositório CriptoGit.");
+        }
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        // Inicia o processamento recursivo das Trees
+        processTreesRecursively(Paths.get(repositorio.getPath()), objectsPath, md);
+    }
+    // Sobrecarga do método - versão sem Tree (para uso externo)
+    private void processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md) throws IOException {
+        processTreesRecursively(currentPath, objectsPath, md, null);
+        
+    }
+
+    /**
+     * Processa as Trees recursivamente
+     * @param currentPath
+     * @param objectsPath
+     * @param md
+     * @param parentTree
+     * @throws IOException
+     */
+    private void processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md, Tree parentTree) throws IOException {
+        // Lista todos os os itens do diretório atual
+        try (var stream = Files.list(currentPath)) {
+            // Cria uma nova Tree para o diretório atual
+            Tree currentTree = new Tree();
+            currentTree.setName(currentPath.getFileName().toString());
+            for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
+                // Se o index estiver vazio, termina o processamento
+                if (index.getBlobs().isEmpty()) {
+                    break;
+                }
+                // Ignora diretórios que começam com .
+                if (item.toString().contains("\\.")) {
+                    continue;
+                }
+                if (Files.isDirectory(item)) {
+                    // Se é um diretório, processa recursivamente
+                    processTreesRecursively(item, objectsPath, md, currentTree);
+                } else if (Files.isRegularFile(item)) {
+                    // Confere se é um dos arquivos inclusos no index
+                    for (Blob blob : index.getBlobs()) {
+                        if (item.toString().contains(blob.getRelativePath())) {
+                            // Se é um arquivo listado no index, cria o objeto Arquivo e adiciona à Tree atual
+                            Arquivo arquivo = new Arquivo();
+                            arquivo.setName(item.getFileName().toString());
+                            arquivo.setBlob(blob);
+                            currentTree.addArquivo(arquivo);
+                            // Remove o arquivo do index em memória, pois ele já foi processado
+                            index.removeBlob(blob);
+                            break;
+                        }
+                    }
+                }
+            }
+            // Depois de montada uma Tree, monta um blob e salva no diretório objects
+            // Para cada arquivo e tree da Tree atual, escreve seu nome e sua hash no blob
+            if (currentTree.getArquivos().size() > 0 || currentTree.getTrees().size() > 0) {
+                processDirectory(currentPath, objectsPath, md, currentTree);
+                // Se há um parentTree, adiciona a currentTree como filha
+                if (parentTree != null) {
+                    parentTree.addTree(currentTree);
+                }
+            }
+            
+        }
+    }
 
     public void generateObjects(String path) throws Exception {
         // Cria os objects de um diretório com .criptogit
@@ -275,7 +368,7 @@ public class RepositorioService {
             
             // Processa cada arquivo e diretório do diretório atual
             for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
-                // Ignora o diretório .criptogit
+                // Ignora diretórios que começam com .
                 if (item.toString().contains("\\.")) {
                     continue;
                 }

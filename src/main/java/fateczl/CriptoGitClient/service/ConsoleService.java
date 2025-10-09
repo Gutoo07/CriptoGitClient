@@ -23,6 +23,11 @@ public class ConsoleService {
                     String filename = scanner.nextLine();
                     repositorioService.add(filename);
                     break;
+                case "commit":
+                    System.out.print("Digite a mensagem do commit: ");
+                    String message = scanner.nextLine();
+                    repositorioService.commit(message);
+                    break;
                 case "exit":
                     System.out.println("Saindo...");
                     break;

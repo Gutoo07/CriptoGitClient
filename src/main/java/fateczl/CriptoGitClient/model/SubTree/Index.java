@@ -20,11 +20,12 @@ public class Index {
 
     public void addBlob(Blob blob, String repositorioPath, String filePath) throws IOException {
         try {
+            // Remove o caminho do repositório do caminho do arquivo, mantendo apenas o caminho relativo
+            filePath = filePath.replace(repositorioPath, "");
+            blob.setRelativePath(filePath);
             // Adiciona o blob ao index
             this.blobs.add(blob);
             StringBuilder indexContent = new StringBuilder();
-            // Remove o caminho do repositório do caminho do arquivo, mantendo apenas o caminho relativo
-            filePath = filePath.replace(repositorioPath, "");
             // Monta a linha do index com a SHA-1 do blob e o caminho do arquivo
             indexContent.append(blob.getHash()).append(" ").append(filePath).append("\n");
             Path indexPath = Paths.get(repositorioPath, ".criptogit", "index");

@@ -5,8 +5,8 @@ public class Commit {
     private String message;
     private String author;
     private String date;
-    private String treeHash;
-    private String parentHash;
+    private Tree rootTree;
+    private Commit parent;
 
     public void setHash(String hash) {
         this.hash = hash;
@@ -24,12 +24,12 @@ public class Commit {
         this.date = date;
     }
 
-    public void setTreeHash(String treeHash) {
-        this.treeHash = treeHash;
+    public void setRootTree(Tree rootTree) {
+        this.rootTree = rootTree;
     }
 
-    public void setParentHash(String parentHash) {
-        this.parentHash = parentHash;
+    public void setParent(Commit parent) {
+        this.parent = parent;
     }
 
     public String getHash() {
@@ -48,11 +48,11 @@ public class Commit {
         return date;
     }
 
-    public String getTreeHash() {
-        return treeHash;
+    public Tree getRootTree() {
+        return rootTree;
     }
 
-    public String getParentHash() {
-        return parentHash;
+    public Commit getParent() {
+        return parent;
     }
 }

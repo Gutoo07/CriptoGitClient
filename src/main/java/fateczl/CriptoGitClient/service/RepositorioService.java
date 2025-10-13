@@ -240,19 +240,12 @@ public class RepositorioService {
 
     /*
      * Cria as trees necessarias para o commit, incluindo a tree raiz
-     * Ainda falta criar o object do commit em si, que guardará os metadados no objeto commit
-     * e apontará para a tree raiz
+     * Cria o object do blob do commit em si, que guardará os metadados
      * @param message
      * @throws Exception
      */
     
     public void commit(String message) throws Exception {
-        // Cria o objeto de commit com os metadados
-        Commit commit = new Commit();
-        commit.setMessage(message);
-        commit.setDate(new Date().toString());
-        commit.setAuthor(System.getProperty("user.name"));
-        
         // Verifica se o diretório .criptogit existe
         if (!Files.exists(Paths.get(repositorio.getPath(), ".criptogit"))) {
             throw new IOException("Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
@@ -262,14 +255,23 @@ public class RepositorioService {
         if (!Files.exists(objectsPath)) {            
             throw new IOException("Diretório objects não existe. Execute o comando init para criar um repositório CriptoGit.");
         }
+        // Cria o objeto de commit com os metadados
+        Commit commit = new Commit();
+        commit.setMessage(message);
+        commit.setDate(new Date().toString());
+        commit.setAuthor(System.getProperty("user.name"));
+        
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         // Inicia o processamento recursivo das Trees
-        processTreesRecursively(Paths.get(repositorio.getPath()), objectsPath, md);
+        Tree rootTree = processTreesRecursively(Paths.get(repositorio.getPath()), objectsPath, md);
+        // Define o apontamento para a tree raiz
+        commit.setRootTree(rootTree);
+        // Salva o objeto de commit no diretório objects
+        processCommit(commit, objectsPath, md);
     }
     // Sobrecarga do método - versão sem Tree (para uso externo)
-    private void processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md) throws IOException {
-        processTreesRecursively(currentPath, objectsPath, md, null);
-        
+    private Tree processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md) throws IOException {
+        return processTreesRecursively(currentPath, objectsPath, md, null);        
     }
 
     /**
@@ -280,7 +282,7 @@ public class RepositorioService {
      * @param parentTree
      * @throws IOException
      */
-    private void processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md, Tree parentTree) throws IOException {
+    private Tree processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md, Tree parentTree) throws IOException {
         // Lista todos os os itens do diretório atual
         try (var stream = Files.list(currentPath)) {
             // Cria uma nova Tree para o diretório atual
@@ -321,9 +323,10 @@ public class RepositorioService {
                 // Se há um parentTree, adiciona a currentTree como filha
                 if (parentTree != null) {
                     parentTree.addTree(currentTree);
+                    return null;
                 }
             }
-            
+            return currentTree;
         }
     }
 
@@ -429,6 +432,47 @@ public class RepositorioService {
         arquivo.setBlob(blob);
         this.index.addBlob(arquivo.getBlob(), repositorio.getPath(), file.toString());
         return arquivo;
+    }
+
+    /**
+     * Processa o conteúdo do Commit e gera seu blob
+     */
+
+    private void processCommit(Commit commit, Path objectsPath, MessageDigest md) throws IOException {
+        // Define as linhas a serem escritas no blob do commit
+        StringBuilder blobContent = new StringBuilder();
+        blobContent.append("tree ").append(commit.getRootTree().getHash()).append("\n");
+        if (commit.getParent() != null) {
+            blobContent.append("parent ").append(commit.getParent().getHash()).append("\n");
+        }
+        blobContent.append("author ").append(commit.getAuthor()).append("\n");
+        blobContent.append("date ").append(commit.getDate()).append("\n");
+        blobContent.append("message ").append(commit.getMessage()).append("\n");
+        
+        // Calcula a hash do conteúdo do commit
+        byte[] sha1bytes = md.digest(blobContent.toString().getBytes());
+        StringBuilder sb = new StringBuilder();
+        for (byte b : sha1bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        commit.setHash(sb.toString());
+        
+        // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+        String hash = commit.getHash();
+        String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
+        String fileName = hash.substring(2);         // 38 caracteres restantes
+        
+        // Monta o blob do commit para ser armazenado
+        Blob commitBlob = new Blob();
+        commitBlob.setContent(blobContent.toString().getBytes());
+        commitBlob.setHash(commit.getHash());
+        
+        // Cria a pasta do blob
+        Path objectDir = Paths.get(objectsPath.toString(), dirName);
+        createDirectory(objectDir);
+        // Cria o blob
+        Path objectFile = Paths.get(objectDir.toString(), fileName);
+        createFile(objectFile, commitBlob);
     }
     /**
      * Cria uma pasta no diretório objects

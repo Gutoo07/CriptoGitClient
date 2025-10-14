@@ -5,7 +5,7 @@ import fateczl.CriptoGitClient.model.Tree;
 import fateczl.CriptoGitClient.model.Repositorio;
 import fateczl.CriptoGitClient.model.Blob;
 import fateczl.CriptoGitClient.model.Commit;
-import fateczl.CriptoGitClient.model.SubTree.Index;
+import fateczl.CriptoGitClient.model.Index;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -119,8 +119,13 @@ public class RepositorioService {
         // Pega o caminho do diretório objects
         Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
         
+        // Limpa o nome do arquivo, caso tenha sido inputado como caminho
+        filename = filename.trim();
+        if (filename.startsWith("\"") && filename.endsWith("\"")) {
+            filename = filename.substring(1, filename.length() - 1);
+        }
         // Procura o arquivo em toda a estrutura de diretórios
-        Path filePath = findFileInRepository(filename);
+        Path filePath = filename.contains(repositorio.getPath()) ? Paths.get(filename) : findFileInRepository(filename);
         
         // Se o arquivo não for encontrado, lança uma exceção
         if (filePath == null) {
@@ -260,6 +265,17 @@ public class RepositorioService {
         commit.setMessage(message);
         commit.setDate(new Date().toString());
         commit.setAuthor(System.getProperty("user.name"));
+        // Procura se existe um commit anterior através do HEAD
+        Path headPath = Paths.get(repositorio.getPath(), ".criptogit", "HEAD");
+        if (Files.exists(headPath)) {
+            List<String> parentCommitHash = Files.readAllLines(headPath);
+            if (!parentCommitHash.isEmpty()) {
+                commit.setParent(parentCommitHash.getFirst());
+                // Adiciona os arquivos referenciados no commit anterior ao index (apenas em memória)
+                getParentCommitFiles(parentCommitHash.getFirst());
+            }
+        }
+        
         
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         // Inicia o processamento recursivo das Trees
@@ -268,7 +284,116 @@ public class RepositorioService {
         commit.setRootTree(rootTree);
         // Salva o objeto de commit no diretório objects
         processCommit(commit, objectsPath, md);
+
+        // Cria/Atualiza o arquivo HEAD, apontando pra esse commit        
+        Files.write(headPath, commit.getHash().getBytes());
+
+        // Limpa o index
+        Path indexPath = Paths.get(repositorio.getPath(), ".criptogit", "index");
+        Files.write(indexPath, new byte[0]);
     }
+    /**
+     * Busca os arquivos referenciados em um commit anterior e os adiciona ao index
+     * para serem referenciados no novo commit
+     * @throws Exception 
+     */
+    public void getParentCommitFiles(String parentHash) throws Exception {        
+        // Lê o commit para obter a hash da tree raiz
+        String rootTreeHash = getRootTreeHashFromCommit(parentHash);
+        
+        // Inicia o processo recursivo a partir da tree raiz
+        getLastCommitFilesRecursively(rootTreeHash, "");
+        
+        System.out.println("Index reconstruído com " + index.getBlobs().size() + " arquivos do commit " + parentHash);
+    }
+    
+    /**
+     * Lê o commit e extrai a hash da tree raiz
+     */
+    private String getRootTreeHashFromCommit(String commitHash) throws IOException {
+        // Procura o blob do commit
+        Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
+        String dirName = commitHash.substring(0, 2);
+        String fileName = commitHash.substring(2);
+        Path commitPath = Paths.get(objectsPath.toString(), dirName, fileName);
+        
+        // Se não encontrar, lança exceção
+        if (!Files.exists(commitPath)) {
+            throw new IOException("Commit não encontrado: " + commitHash);
+        }
+        
+        // Lê o conteúdo do commit
+        String commitContent = new String(Files.readAllBytes(commitPath));
+        String[] lines = commitContent.split("\n");
+        
+        // A primeira linha deve conter "tree <hash>"
+        if (lines.length > 0 && lines[0].startsWith("tree ")) {
+            return lines[0].substring(5); // Remove "tree " do início e retorna a hash
+        }
+        
+        throw new IOException("Formato de commit inválido: " + commitHash);
+    }
+    
+    /**
+     * Processa uma tree recursivamente, montando os blobs anteriores com seus relativePaths no index
+     * para serem referenciados novamente no novo Commit
+     */
+    private void getLastCommitFilesRecursively(String treeHash, String currentPath) throws IOException {
+        // Busca o blob da tree atual através da hash
+        Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
+        String dirName = treeHash.substring(0, 2);
+        String fileName = treeHash.substring(2);
+        Path treePath = Paths.get(objectsPath.toString(), dirName, fileName);
+        
+        // Se não encontrou, lança exceção
+        if (!Files.exists(treePath)) {
+            throw new IOException("Tree não encontrada: " + treeHash);
+        }
+        
+        // Lê o conteúdo da tree
+        String treeContent = new String(Files.readAllBytes(treePath));
+        String[] lines = treeContent.split("\n");
+        
+        for (String line : lines) {
+            // Se a linha estiver vazia, pula pra próxima linha
+            if (line.trim().isEmpty()) {
+                continue;
+            }
+            // Divide as partes da linha
+            String[] parts = line.split(" ");
+            // Formato padrão de tree: tree <nomeDaPasta> <hashDaTree>
+            // ou blob <nomeDoArquivo> <hashDoBlob>
+            // então só processa se tiver 3 partes
+            if (parts.length >= 3) {
+                String type = parts[0]; // "blob" ou "tree"
+                String name = parts[1]; // <nomeDoArquivo/Pasta>
+                String hash = parts[2]; // <hashDoBlob/Tree>
+                
+                // se aquela linha referenciar um blob
+                if ("blob".equals(type)) {
+                    // Cria o blob e adiciona ao index
+                    Blob blob = new Blob();
+                    blob.setHash(hash);
+                    
+                    // Monta o relativePath
+                    String relativePath = currentPath.isEmpty() ? "\\" + name : currentPath + "\\" + name;
+                    blob.setRelativePath(relativePath);
+                    
+                    // Adiciona ao index
+                    index.getBlobs().add(blob);
+                    
+                    System.out.println("Blob referenciado: " + relativePath + " (hash: " + hash + ")");
+                    
+                } else if ("tree".equals(type)) {
+                    // Se aquela linha referenciar uma tree
+                    // Chama recursivamente para processar a sub-tree
+                    String newPath = currentPath.isEmpty() ? "\\" + name : currentPath + "\\" + name;
+                    getLastCommitFilesRecursively(hash, newPath);
+                }
+            }
+        }
+    }
+
     // Sobrecarga do método - versão sem Tree (para uso externo)
     private Tree processTreesRecursively(Path currentPath, Path objectsPath, MessageDigest md) throws IOException {
         return processTreesRecursively(currentPath, objectsPath, md, null);        
@@ -442,8 +567,8 @@ public class RepositorioService {
         // Define as linhas a serem escritas no blob do commit
         StringBuilder blobContent = new StringBuilder();
         blobContent.append("tree ").append(commit.getRootTree().getHash()).append("\n");
-        if (commit.getParent() != null) {
-            blobContent.append("parent ").append(commit.getParent().getHash()).append("\n");
+        if (commit.getParentHash() != null) {
+            blobContent.append("parent ").append(commit.getParentHash()).append("\n");
         }
         blobContent.append("author ").append(commit.getAuthor()).append("\n");
         blobContent.append("date ").append(commit.getDate()).append("\n");
@@ -501,4 +626,5 @@ public class RepositorioService {
             Files.write(objectFile, blob.getContent());
         }
     }
+
 }

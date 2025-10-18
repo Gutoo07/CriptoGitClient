@@ -6,6 +6,7 @@ import java.util.Scanner;
 public class ConsoleService {
     private final Scanner scanner = new Scanner(System.in);
     private RepositorioService repositorioService = new RepositorioService();
+    private UnlockService unlockService = new UnlockService();
 
     public void run() {
         String command;
@@ -27,6 +28,13 @@ public class ConsoleService {
                     System.out.print("Digite a mensagem do commit: ");
                     String message = scanner.nextLine();
                     repositorioService.commit(message);
+                    break;
+                case "unlock":
+                    if (repositorioService.getRepositorio() == null) {
+                        System.out.println("Erro: Repositório não inicializado. Execute 'init' primeiro.");
+                        break;
+                    }
+                    unlockService.unlock(repositorioService.getRepositorio().getPath());
                     break;
                 case "exit":
                     System.out.println("Saindo...");

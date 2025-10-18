@@ -140,30 +140,7 @@ public class RepositorioService {
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         
         // Cria o blob do arquivo e adiciona ao index
-        processFile(filePath, objectsPath, md);      
-        
-        /*        
-        // 2. Reconstrói as trees dos diretórios pais
-        // Busca o diretório pai do arquivo e monta a tree na memória
-        Path parentPath = filePath.getParent();
-        Tree tree = new Tree();
-        tree.setName(parentPath.getFileName().toString());
-        tree.addArquivo(arquivo);
-        // Processa o diretório pai do arquivo e persiste sua tree no diretório objects
-        processDirectory(parentPath, objectsPath, md, tree);
-
-        // Se o diretório pai não for o próprio repositório, processa o diretório pai
-        while (!parentPath.getFileName().toString().equals(repositorio.getName())) {
-            // Busca o diretório pai do diretório atual
-            parentPath = parentPath.getParent();
-            Tree parentTree = new Tree();
-            parentTree.setName(parentPath.getFileName().toString());
-            parentTree.addTree(tree);
-            // Processa o diretório pai e persiste sua tree no diretório objects
-            processDirectory(parentPath, objectsPath, md, parentTree);
-            tree = parentTree;
-        }
-        */
+        processFile(filePath, objectsPath, md);
     }
     /**
      * Processa um diretório e persiste sua tree no diretório objects
@@ -291,6 +268,10 @@ public class RepositorioService {
         // Limpa o index
         Path indexPath = Paths.get(repositorio.getPath(), ".criptogit", "index");
         Files.write(indexPath, new byte[0]);
+
+        // Criptografa o commit
+        CriptografiaService criptografiaService = new CriptografiaService();
+        criptografiaService.encryptBlobs(repositorio.getPath(), commit.getHash());
     }
     /**
      * Busca os arquivos referenciados em um commit anterior e os adiciona ao index
@@ -625,6 +606,14 @@ public class RepositorioService {
             System.out.println("Criando o object: " + objectFile.getFileName().toString());
             Files.write(objectFile, blob.getContent());
         }
+    }
+    
+    /**
+     * Retorna o repositório atual
+     * @return Repositório atual
+     */
+    public Repositorio getRepositorio() {
+        return repositorio;
     }
 
 }

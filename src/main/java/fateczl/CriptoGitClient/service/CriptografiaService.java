@@ -321,9 +321,9 @@ public class CriptografiaService {
      * @throws Exception Se houver erro ao carregar as chaves
      */
     private void loadPublicKeys(String repositorioPath) throws Exception {
-        Path keysPath = Paths.get(repositorioPath, "keys");
+        Path keysPath = Paths.get(repositorioPath, ".criptogit", "keys");
         if (!Files.exists(keysPath)) {
-            throw new Exception("Erro: pasta 'keys' não encontrada no repositório");
+            throw new Exception("Erro: pasta 'keys' não encontrada no repositório. Crie a pasta 'keys' em .criptogit e adicione suas chaves com os comandos: openssl genrsa -out private_key.pem 2048 && openssl rsa -in private_key.pem -pubout -out public_key.pem");
         }
         
         // Limpa a lista de chaves públicas

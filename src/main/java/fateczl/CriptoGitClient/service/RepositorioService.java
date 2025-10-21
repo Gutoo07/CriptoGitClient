@@ -265,13 +265,14 @@ public class RepositorioService {
         // Cria/Atualiza o arquivo HEAD, apontando pra esse commit        
         Files.write(headPath, commit.getHash().getBytes());
 
-        // Limpa o index
-        Path indexPath = Paths.get(repositorio.getPath(), ".criptogit", "index");
-        Files.write(indexPath, new byte[0]);
-
+        
         // Criptografa o commit
         CriptografiaService criptografiaService = new CriptografiaService();
         criptografiaService.encryptBlobs(repositorio.getPath(), commit.getHash());
+        
+        // Limpa o index
+        Path indexPath = Paths.get(repositorio.getPath(), ".criptogit", "index");
+        Files.write(indexPath, new byte[0]);
     }
     /**
      * Busca os arquivos referenciados em um commit anterior e os adiciona ao index

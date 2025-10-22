@@ -287,7 +287,7 @@ public class UnlockService {
             // Loop interno: tenta usar a chave atual em todos os arquivos não processados
             for (Path file : unprocessedFiles) {
                 
-                if (tryDecryptWithSingleKey(file, currentKey, unlockedPath)) {
+                if (tryDecryptWithSingleKey(file, currentKey)) {
                     // Chave foi usada com sucesso, remove da lista para evitar loops desnecessários
                     keyUsed = true;
                     break; // Cada chave só pode abrir um arquivo
@@ -306,10 +306,9 @@ public class UnlockService {
      * Tenta descriptografar um arquivo específico com uma única chave simétrica
      * @param file Arquivo a ser descriptografado
      * @param symmetricKey Chave simétrica para tentar
-     * @param unlockedPath Caminho da pasta unlocked
      * @return true se a descriptografia foi bem-sucedida, false caso contrário
      */
-    private boolean tryDecryptWithSingleKey(Path file, SecretKey symmetricKey, Path unlockedPath) {
+    private boolean tryDecryptWithSingleKey(Path file, SecretKey symmetricKey) {
         try {
             byte[] encryptedData = Files.readAllBytes(file);
             
@@ -322,9 +321,8 @@ public class UnlockService {
             // Agora tenta descriptografar o nome do arquivo com a mesma chave
             String decryptedFileName = tryDecryptFileName(file.getFileName().toString(), symmetricKey);
             
-            // Salva o arquivo descriptografado na pasta unlocked com o nome descriptografado
-            Path decryptedFile = unlockedPath.resolve(decryptedFileName);
-            Files.write(decryptedFile, decryptedData);
+            // Salva o blob descriptografado na pasta .criptogit/objects
+            saveDecryptedBlob(decryptedData, decryptedFileName, file);
             
             // Apaga o arquivo criptografado original
             Files.delete(file);
@@ -335,7 +333,7 @@ public class UnlockService {
             System.out.println("  → Arquivo criptografado removido");
             
             // Tenta interpretar o conteúdo descriptografado
-            tryInterpretDecryptedContent(decryptedData, decryptedFile);
+            tryInterpretDecryptedContent(decryptedData, decryptedFileName);
             
             return true; // Descriptografia bem-sucedida
             
@@ -389,11 +387,46 @@ public class UnlockService {
     }
     
     /**
+     * Salva o blob descriptografado na pasta .criptogit/objects seguindo o padrão do comando add
+     * @param decryptedData Dados descriptografados
+     * @param decryptedFileName Nome do arquivo descriptografado (que é a hash completa)
+     * @param originalFile Arquivo original para obter o caminho do repositório
+     * @throws Exception Se houver erro ao salvar
+     */
+    private void saveDecryptedBlob(byte[] decryptedData, String decryptedFileName, Path originalFile) throws Exception {
+        // Obtém o caminho do repositório a partir do arquivo original
+        Path repositorioPath = originalFile.getParent().getParent().getParent();
+        Path objectsPath = Paths.get(repositorioPath.toString(), ".criptogit", "objects");
+        
+        // A hash completa é o decryptedFileName
+        String hash = decryptedFileName;
+        
+        // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+        String dirName = hash.substring(0, 2);        // 2 primeiros caracteres
+        String fileName = hash.substring(2);         // 38 caracteres restantes
+        
+        // Cria a pasta se não existir
+        Path objectDir = Paths.get(objectsPath.toString(), dirName);
+        if (!Files.exists(objectDir)) {
+            Files.createDirectories(objectDir);
+        }
+        
+        // Cria o arquivo do blob se não existir
+        Path objectFile = Paths.get(objectDir.toString(), fileName);
+        if (!Files.exists(objectFile)) {
+            Files.write(objectFile, decryptedData);
+            System.out.println("  → Blob salvo em: .criptogit/objects/" + dirName + "/" + fileName);
+        } else {
+            System.out.println("  → Blob já existe, não foi sobrescrito: .criptogit/objects/" + dirName + "/" + fileName);
+        }
+    }
+    
+    /**
      * Tenta interpretar o conteúdo descriptografado para identificar o tipo de objeto
      * @param decryptedData Dados descriptografados
-     * @param decryptedFile Arquivo descriptografado
+     * @param decryptedFileName Nome do arquivo descriptografado
      */
-    private void tryInterpretDecryptedContent(byte[] decryptedData, Path decryptedFile) {
+    private void tryInterpretDecryptedContent(byte[] decryptedData, String decryptedFileName) {
         try {
             String content = new String(decryptedData);
             
@@ -467,16 +500,16 @@ public class UnlockService {
         // Lê o arquivo HEAD para obter o hash do commit
         String commitHash = readHeadFile(unlockedPath);
         if (commitHash == null) {
-            System.out.println("⚠ Arquivo HEAD não encontrado ou vazio");
+            System.err.println("⚠ Arquivo HEAD não encontrado ou vazio");
             return;
         }
         
         System.out.println("Hash do commit HEAD: " + commitHash);
         
-        // Carrega e processa o commit
-        Commit commit = loadCommit(unlockedPath, commitHash);
+        // Carrega e processa o commit (agora busca na pasta objects)
+        Commit commit = loadCommit(repositorioPath, commitHash);
         if (commit == null) {
-            System.out.println("✗ Erro ao carregar commit: " + commitHash);
+            System.err.println("✗ Erro ao carregar commit: " + commitHash);
             return;
         }
         
@@ -487,14 +520,14 @@ public class UnlockService {
         // Obtém a tree raiz do commit
         Tree rootTree = commit.getRootTree();
         if (rootTree == null) {
-            System.out.println("✗ Commit não possui tree raiz");
+            System.err.println("✗ Commit não possui tree raiz");
             return;
         }
         
         System.out.println("Tree raiz: " + rootTree.getHash());
         
-        // Processa recursivamente a tree raiz
-        processTreeRecursively(unlockedPath, wdPath, rootTree);
+        // Processa recursivamente a tree raiz (agora busca na pasta objects)
+        processTreeRecursively(repositorioPath, wdPath, rootTree);
         
         System.out.println("✓ Árvore de diretórios remontada com sucesso em: " + wdPath);
     }
@@ -523,14 +556,14 @@ public class UnlockService {
     
     /**
      * Carrega um commit a partir do seu hash
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @param commitHash Hash do commit
      * @return Commit carregado ou null se erro
      */
-    private Commit loadCommit(Path unlockedPath, String commitHash) {
+    private Commit loadCommit(String repositorioPath, String commitHash) {
         try {
-            // Procura pelo arquivo do commit na pasta unlocked
-            Path commitFile = findObjectFile(unlockedPath, commitHash);
+            // Procura pelo arquivo do commit na pasta objects
+            Path commitFile = findObjectFile(repositorioPath, commitHash);
             if (commitFile == null) {
                 System.out.println("✗ Arquivo do commit não encontrado: " + commitHash);
                 return null;
@@ -541,7 +574,7 @@ public class UnlockService {
             String commitContent = new String(commitData);
             
             // Parse do commit
-            return parseCommitContent(commitContent, commitHash, unlockedPath);
+            return parseCommitContent(commitContent, commitHash, repositorioPath);
             
         } catch (Exception e) {
             System.out.println("✗ Erro ao carregar commit: " + e.getMessage());
@@ -550,13 +583,19 @@ public class UnlockService {
     }
     
     /**
-     * Encontra o arquivo de um objeto pelo seu hash
-     * @param unlockedPath Caminho da pasta unlocked
+     * Encontra o arquivo de um objeto pelo seu hash na pasta objects
+     * @param repositorioPath Caminho do repositório
      * @param objectHash Hash do objeto
      * @return Path do arquivo ou null se não encontrado
      */
-    private Path findObjectFile(Path unlockedPath, String objectHash) {
-        Path objectFile = unlockedPath.resolve(objectHash);
+    private Path findObjectFile(String repositorioPath, String objectHash) {
+        // Pega os 2 primeiros caracteres da hash para o diretório e os 38 restantes para o arquivo
+        String dirName = objectHash.substring(0, 2);        // 2 primeiros caracteres
+        String fileName = objectHash.substring(2);         // 38 caracteres restantes
+        
+        Path objectsPath = Paths.get(repositorioPath, ".criptogit", "objects");
+        Path objectFile = objectsPath.resolve(dirName).resolve(fileName);
+        
         return Files.exists(objectFile) ? objectFile : null;
     }
     
@@ -564,10 +603,10 @@ public class UnlockService {
      * Faz o parse do conteúdo de um commit
      * @param commitContent Conteúdo do commit
      * @param commitHash Hash do commit
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @return Commit parseado
      */
-    private Commit parseCommitContent(String commitContent, String commitHash, Path unlockedPath) {
+    private Commit parseCommitContent(String commitContent, String commitHash, String repositorioPath) {
         Commit commit = new Commit();
         commit.setHash(commitHash);
         
@@ -590,7 +629,7 @@ public class UnlockService {
         
         // Carrega a tree raiz
         if (treeHash != null) {
-            Tree rootTree = loadTree(unlockedPath, treeHash);
+            Tree rootTree = loadTree(repositorioPath, treeHash);
             commit.setRootTree(rootTree);
         }
         
@@ -599,14 +638,14 @@ public class UnlockService {
     
     /**
      * Carrega uma tree a partir do seu hash
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @param treeHash Hash da tree
      * @return Tree carregada ou null se erro
      */
-    private Tree loadTree(Path unlockedPath, String treeHash) {
+    private Tree loadTree(String repositorioPath, String treeHash) {
         try {
-            // Procura pelo arquivo da tree na pasta unlocked
-            Path treeFile = findObjectFile(unlockedPath, treeHash);
+            // Procura pelo arquivo da tree na pasta objects
+            Path treeFile = findObjectFile(repositorioPath, treeHash);
             if (treeFile == null) {
                 System.out.println("✗ Arquivo da tree não encontrado: " + treeHash);
                 return null;
@@ -617,7 +656,7 @@ public class UnlockService {
             String treeContent = new String(treeData);
             
             // Parse da tree
-            return parseTreeContent(treeContent, treeHash, unlockedPath);
+            return parseTreeContent(treeContent, treeHash, repositorioPath);
             
         } catch (Exception e) {
             System.out.println("✗ Erro ao carregar tree: " + e.getMessage());
@@ -629,10 +668,10 @@ public class UnlockService {
      * Faz o parse do conteúdo de uma tree
      * @param treeContent Conteúdo da tree
      * @param treeHash Hash da tree
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @return Tree parseada
      */
-    private Tree parseTreeContent(String treeContent, String treeHash, Path unlockedPath) {
+    private Tree parseTreeContent(String treeContent, String treeHash, String repositorioPath) {
         Tree tree = new Tree();
         tree.setHash(treeHash);
         
@@ -662,7 +701,7 @@ public class UnlockService {
                     String treeName = parts[0];
                     String subTreeHash = parts[1];
                     
-                    Tree subTree = loadTree(unlockedPath, subTreeHash);
+                    Tree subTree = loadTree(repositorioPath, subTreeHash);
                     if (subTree != null) {
                         subTree.setName(treeName);
                         tree.addTree(subTree);
@@ -676,12 +715,12 @@ public class UnlockService {
     
     /**
      * Processa recursivamente uma tree, criando arquivos e pastas
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @param currentPath Caminho atual onde estamos criando os arquivos
      * @param tree Tree a ser processada
      * @throws Exception Se houver erro no processamento
      */
-    private void processTreeRecursively(Path unlockedPath, Path currentPath, Tree tree) throws Exception {
+    private void processTreeRecursively(String repositorioPath, Path currentPath, Tree tree) throws Exception {
         System.out.println("Processando tree: " + tree.getHash() + " em: " + currentPath);
         
         // Processa todos os arquivos (blobs) desta tree
@@ -690,7 +729,7 @@ public class UnlockService {
             String fileName = arquivo.getName();
             
             // Carrega o conteúdo do blob
-            byte[] blobContent = loadBlobContent(unlockedPath, blob.getHash());
+            byte[] blobContent = loadBlobContent(repositorioPath, blob.getHash());
             if (blobContent != null) {
                 // Cria o arquivo
                 Path filePath = currentPath.resolve(fileName);
@@ -711,20 +750,20 @@ public class UnlockService {
             System.out.println("  ✓ Pasta criada: " + treeName);
             
             // Processa recursivamente a sub-tree
-            processTreeRecursively(unlockedPath, subTreePath, subTree);
+            processTreeRecursively(repositorioPath, subTreePath, subTree);
         }
     }
     
     /**
      * Carrega o conteúdo de um blob
-     * @param unlockedPath Caminho da pasta unlocked
+     * @param repositorioPath Caminho do repositório
      * @param blobHash Hash do blob
      * @return Conteúdo do blob ou null se erro
      */
-    private byte[] loadBlobContent(Path unlockedPath, String blobHash) {
+    private byte[] loadBlobContent(String repositorioPath, String blobHash) {
         try {
-            // Procura pelo arquivo do blob na pasta unlocked
-            Path blobFile = findObjectFile(unlockedPath, blobHash);
+            // Procura pelo arquivo do blob na pasta objects
+            Path blobFile = findObjectFile(repositorioPath, blobHash);
             if (blobFile == null) {
                 System.out.println("✗ Arquivo do blob não encontrado: " + blobHash);
                 return null;

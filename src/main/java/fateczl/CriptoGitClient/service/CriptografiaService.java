@@ -156,6 +156,16 @@ public class CriptografiaService {
             throw new IOException("Blob não encontrado: " + blobHash);
         }
         
+        // Verifica se o blob já foi criptografado anteriormente
+        String keyName = blobHash + ".key";
+        Path keyPath = Paths.get(objectsPath.toString(), dirName, keyName);
+        
+        if (Files.exists(keyPath)) {
+            // Blob já foi criptografado, não precisa processar novamente
+            System.out.println("Blob já criptografado, pulando: " + blobHash);
+            return blobHash; // Retorna a hash original pois já está criptografado
+        }
+        
         // Lê o conteúdo do blob
         byte[] originalContent = Files.readAllBytes(blobPath);
         
@@ -169,14 +179,11 @@ public class CriptografiaService {
         byte[] encryptedHash = encryptContent(blobHash.getBytes(), secretKey);
         String encryptedBlobName = bytesToHex(encryptedHash);
         
-        // Gera nome único para a chave
-        String keyName = generateUniqueName();
-        
         // Salva o blob criptografado e sua chave na mesma pasta do blob original
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedBlobName, keyName, dirName, objectsPath, lockedPath);
         
         System.out.println("Blob original: " + blobHash);
-        System.out.println("Blob criptografado salvo em: locked/" + encryptedBlobName.substring(2));
+        System.out.println("Blob criptografado salvo em: locked/" + encryptedBlobName);
         
         return newHash;
     }
@@ -190,6 +197,17 @@ public class CriptografiaService {
      * @return Hash da tree criptografada
      */
     private String encryptTreeContent(String treeContent, String treeHash, Path objectsPath, Path lockedPath) throws Exception {
+        // Verifica se a tree já foi criptografada anteriormente
+        String keyName = treeHash + ".key";
+        String dirName = treeHash.substring(0, 2);
+        Path keyPath = Paths.get(objectsPath.toString(), dirName, keyName);
+        
+        if (Files.exists(keyPath)) {
+            // Tree já foi criptografada, não precisa processar novamente
+            System.out.println("Tree já criptografada, pulando: " + treeHash);
+            return treeHash; // Retorna a hash original pois já está criptografada
+        }
+        
         // Gera uma chave simétrica para a tree
         SecretKey secretKey = generateSymmetricKey();
         
@@ -199,12 +217,6 @@ public class CriptografiaService {
         // Criptografa a hash SHA-1 completa com a mesma chave simétrica
         byte[] encryptedHash = encryptContent(treeHash.getBytes(), secretKey);
         String encryptedTreeName = bytesToHex(encryptedHash);
-        
-        // Gera nome único para a chave
-        String keyName = generateUniqueName();
-        
-        // Usa os primeiros 2 caracteres da hash original para determinar a pasta
-        String dirName = treeHash.substring(0, 2);
         
         // Salva a tree criptografada e sua chave
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedTreeName, keyName, dirName, objectsPath, lockedPath);
@@ -234,6 +246,16 @@ public class CriptografiaService {
             throw new IOException("Commit não encontrado: " + commitHash);
         }
         
+        // Verifica se o commit já foi criptografado anteriormente
+        String keyName = commitHash + ".key";
+        Path keyPath = Paths.get(objectsPath.toString(), dirName, keyName);
+        
+        if (Files.exists(keyPath)) {
+            // Commit já foi criptografado, não precisa processar novamente
+            System.out.println("Commit já criptografado, pulando: " + commitHash);
+            return commitHash; // Retorna a hash original pois já está criptografado
+        }
+        
         // Lê o conteúdo do commit
         String commitContent = new String(Files.readAllBytes(commitPath));
         
@@ -246,9 +268,6 @@ public class CriptografiaService {
         // Criptografa a hash SHA-1 completa com a mesma chave simétrica
         byte[] encryptedHash = encryptContent(commitHash.getBytes(), secretKey);
         String encryptedCommitName = bytesToHex(encryptedHash);
-        
-        // Gera nome único para a chave
-        String keyName = generateUniqueName();
         
         // Salva o commit criptografado e sua chave na mesma pasta do commit original
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedCommitName, keyName, dirName, objectsPath, lockedPath);

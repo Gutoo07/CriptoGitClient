@@ -65,6 +65,15 @@ public class RepositorioService {
                 throw new IOException("Erro ao criar o diretório objects.");
             }
         }
+        // Cria o diretório keys dentro do .criptogit se não existir
+        Path keysPath = Paths.get(path, ".criptogit", "keys");
+        if (!Files.exists(keysPath)) {
+            try {
+                Files.createDirectory(keysPath);
+            } catch (IOException e) {
+                throw new IOException("Erro ao criar o diretório keys.");
+            }
+        }
 
         // Cria o arquivo index se não existir
         Path indexPath = Paths.get(path, ".criptogit", "index");
@@ -237,6 +246,14 @@ public class RepositorioService {
         if (!Files.exists(objectsPath)) {            
             throw new IOException("Diretório objects não existe. Execute o comando init para criar um repositório CriptoGit.");
         }
+        // Verifica se a pasta keys existe e possui chaves simétricas
+        Path keysPath = Paths.get(repositorio.getPath(), ".criptogit", "keys");
+        if (!Files.exists(keysPath)) {
+            throw new IOException("Pasta keys não existe. Execute o comando init para criar um repositório CriptoGit.");
+        }
+        if (Files.list(keysPath).count() == 0) {
+            throw new IOException("Pasta keys está vazia. Crie seu par de chaves pública e privada com os comandos: openssl genrsa -out private_key.pem 2048 && openssl rsa -in private_key.pem -pubout -out public_key.pem");
+        }
         // Cria o objeto de commit com os metadados
         Commit commit = new Commit();
         commit.setMessage(message);
@@ -269,6 +286,9 @@ public class RepositorioService {
         // Criptografa o commit
         CriptografiaService criptografiaService = new CriptografiaService();
         criptografiaService.encryptBlobs(repositorio.getPath(), commit.getHash());
+        
+        // Salva a versão do commit
+        saveCommitVersion(commit.getHash());
         
         // Limpa o index
         Path indexPath = Paths.get(repositorio.getPath(), ".criptogit", "index");
@@ -615,6 +635,64 @@ public class RepositorioService {
      */
     public Repositorio getRepositorio() {
         return repositorio;
+    }
+
+    /**
+     * Salva a versão do commit após o commit ser finalizado
+     * Procura por arquivos de versão na pasta .criptogit/versions e salva o conteúdo do HEAD
+     * @param commitHash Hash do commit que foi criado
+     * @throws Exception Se houver erro ao salvar a versão
+     */
+    private void saveCommitVersion(String commitHash) throws Exception {
+        Path versionsPath = Paths.get(repositorio.getPath(), ".criptogit", "versions");
+        
+        // Cria a pasta versions se não existir
+        if (!Files.exists(versionsPath)) {
+            Files.createDirectories(versionsPath);
+            System.out.println("Pasta versions criada em: " + versionsPath);
+        }
+        
+        // Procura por arquivos cujos nomes são números (versões)
+        int nextVersion = findNextVersionNumber(versionsPath);
+        
+        // Salva o conteúdo do HEAD no arquivo de versão
+        Path versionFile = versionsPath.resolve(String.valueOf(nextVersion));
+        Files.write(versionFile, commitHash.getBytes());
+        
+        System.out.println("Versão " + nextVersion + " salva com sucesso em .criptogit/versions/" + nextVersion + ". Hash do commit: " + commitHash);
+    }
+    
+    /**
+     * Encontra o próximo número de versão baseado nos arquivos existentes na pasta .criptogit/versions
+     * @param versionsPath Caminho da pasta .criptogit/versions
+     * @return Próximo número de versão
+     * @throws Exception Se houver erro ao processar os arquivos
+     */
+    private int findNextVersionNumber(Path versionsPath) throws Exception {
+        int maxVersion = 0;
+        
+        try (var stream = Files.list(versionsPath)) {
+            for (Path file : stream.collect(java.util.stream.Collectors.toList())) {
+                if (Files.isRegularFile(file)) {
+                    String fileName = file.getFileName().toString();
+                    
+                    // Verifica se o nome do arquivo é um número
+                    try {
+                        int versionNumber = Integer.parseInt(fileName);
+                        if (versionNumber > maxVersion) {
+                            maxVersion = versionNumber;
+                        }
+                    } catch (NumberFormatException e) {
+                        // Se não for um número, ignora o arquivo
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        // Se não encontrou nenhum arquivo de versão, é o primeiro commit (versão 1)
+        // Caso contrário, incrementa a maior versão encontrada
+        return maxVersion == 0 ? 1 : maxVersion + 1;
     }
 
 }

@@ -71,9 +71,13 @@ public class UnlockService {
         System.out.println("\nProcesso de unlock concluído!");
         System.out.println("Chaves simétricas obtidas: " + decryptedSymmetricKeys.size());
         System.out.println("Arquivos processados: " + processedFiles.size());
+
+        // Quarta fase: salva o HEAD na pasta .criptogit
+        System.out.println("\n=== FASE 4: Salvando HEAD na pasta .criptogit ===");
+        saveLatestHeadToCriptogit(repositorioPath);
         
-        // Quarta fase: remonta a árvore de diretórios
-        System.out.println("\n=== FASE 4: Remontando árvore de diretórios ===");
+        // Quinta fase: remonta a árvore de diretórios
+        System.out.println("\n=== FASE 5: Remontando árvore de diretórios ===");
         remountWorkingDirectory(repositorioPath, unlockedPath);
     }
     
@@ -912,5 +916,36 @@ public class UnlockService {
             System.out.println("✗ Erro ao carregar blob: " + e.getMessage());
             return null;
         }
+    }
+    
+    /**
+     * Busca o maior HEAD usando readLatestHeadFromVersions e salva o conteúdo na pasta .criptogit como HEAD
+     * @param repositorioPath Caminho do repositório
+     * @throws Exception Se houver erro ao salvar o HEAD
+     */
+    public void saveLatestHeadToCriptogit(String repositorioPath) throws Exception {
+        System.out.println("Buscando o maior HEAD na pasta versions...");
+        
+        // Busca o maior HEAD usando a função existente
+        String latestHeadContent = readLatestHeadFromVersions(repositorioPath);
+        if (latestHeadContent == null) {
+            throw new Exception("Nenhum HEAD encontrado na pasta versions");
+        }
+        
+        // Cria o caminho para o arquivo HEAD na pasta .criptogit
+        Path criptogitPath = Paths.get(repositorioPath, ".criptogit");
+        Path headFile = criptogitPath.resolve("HEAD");
+        
+        // Cria a pasta .criptogit se não existir
+        if (!Files.exists(criptogitPath)) {
+            Files.createDirectories(criptogitPath);
+            System.out.println("Pasta .criptogit criada em: " + criptogitPath);
+        }
+        
+        // Salva o conteúdo do HEAD no arquivo
+        Files.write(headFile, latestHeadContent.getBytes());
+        
+        System.out.println("✓ HEAD salvo com sucesso em: " + headFile);
+        System.out.println("  → Conteúdo: " + latestHeadContent);
     }
 }

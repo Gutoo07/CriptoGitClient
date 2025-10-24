@@ -79,6 +79,9 @@ public class CriptografiaService {
         System.out.println("Commit original: " + commitHash);
         System.out.println("Commit criptografado: " + encryptedCommitHash);
         System.out.println("Arquivos criptografados salvos em: .criptogit/locked");
+        
+        // Criptografa o HEAD após criptografar blobs, trees e commits
+        encryptHead(repositorioPath, commitHash);
     }
     
     /**
@@ -457,6 +460,104 @@ public class CriptografiaService {
         }
                 
         return encryptedName;
+    }
+    
+    /**
+     * Criptografa o arquivo HEAD
+     * @param repositorioPath Caminho do repositório
+     * @param commitHash Hash do commit atual (versão do HEAD)
+     * @throws Exception Se houver erro na criptografia
+     */
+    private void encryptHead(String repositorioPath, String commitHash) throws Exception {
+        System.out.println("Iniciando criptografia do HEAD...");
+        
+        // Caminho do arquivo HEAD
+        Path headPath = Paths.get(repositorioPath, ".criptogit", "HEAD");
+        if (!Files.exists(headPath)) {
+            throw new Exception("Erro ao criptografar HEAD: arquivo HEAD não encontrado.");
+        }
+        
+        // Lê o conteúdo do HEAD
+        String headContent = new String(Files.readAllBytes(headPath));
+        System.out.println("Conteúdo do HEAD: " + headContent);
+        
+        // Obtém o número da versão primeiro
+        Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
+        if (!Files.exists(versionsPath)) {
+            Files.createDirectories(versionsPath);
+            System.out.println("Pasta versions criada em: " + versionsPath);
+        }
+        
+        RepositorioService repositorioService = new RepositorioService();
+        int versionNumber = repositorioService.findNextVersionNumber(versionsPath);
+        System.out.println("Versão do HEAD: " + versionNumber);
+        
+        // Gera uma chave simétrica específica para o HEAD
+        SecretKey headSecretKey = generateSymmetricKey();
+        
+        // Criptografa o conteúdo do HEAD
+        byte[] encryptedHeadContent = encryptContent(headContent.getBytes(), headSecretKey);
+        
+        // Criptografa o número da versão com a mesma chave simétrica
+        byte[] encryptedVersionNumber = encryptContent(String.valueOf(versionNumber).getBytes(), headSecretKey);
+        String encryptedHeadFileName = bytesToHex(encryptedVersionNumber);
+        
+        // Caminho da pasta locked
+        Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
+        if (!Files.exists(lockedPath)) {
+            Files.createDirectories(lockedPath);
+        }
+        
+        // Salva o HEAD criptografado na pasta locked
+        Path encryptedHeadFilePath = Paths.get(lockedPath.toString(), encryptedHeadFileName);
+        Files.write(encryptedHeadFilePath, encryptedHeadContent);
+        System.out.println("HEAD criptografado salvo em: locked/" + encryptedHeadFileName + " (versão " + versionNumber + ")");
+        
+        // Criptografa a chave simétrica do HEAD com cada chave pública RSA
+        for (int i = 0; i < publicKeys.size(); i++) {
+            PublicKey publicKey = publicKeys.get(i);
+            byte[] encryptedHeadSymmetricKey = encryptSymmetricKeyWithPublicKey(headSecretKey, publicKey);
+            
+            // Gera nome único para cada chave simétrica criptografada do HEAD
+            String encryptedHeadKeyName = generateUniqueName();
+            
+            // Salva a chave simétrica criptografada do HEAD
+            Path encryptedHeadKeyFilePath = Paths.get(lockedPath.toString(), encryptedHeadKeyName);
+            Files.write(encryptedHeadKeyFilePath, encryptedHeadSymmetricKey);
+            
+            System.out.println("Chave simétrica do HEAD criptografada " + (i + 1) + "/" + publicKeys.size() + 
+                             " salva em: locked/" + encryptedHeadKeyName);
+        }
+        
+        // Salva a chave simétrica original do HEAD na pasta versions
+        saveHeadSymmetricKey(repositorioPath, versionNumber, headSecretKey);
+        
+        System.out.println("Criptografia do HEAD concluída!");
+    }
+    
+    /**
+     * Salva a chave simétrica original do HEAD na pasta versions
+     * @param repositorioPath Caminho do repositório
+     * @param versionNumber Número da versão do HEAD
+     * @param headSecretKey Chave simétrica do HEAD
+     * @throws Exception Se houver erro ao salvar
+     */
+    private void saveHeadSymmetricKey(String repositorioPath, int versionNumber, SecretKey headSecretKey) throws Exception {
+        // Caminho da pasta versions
+        Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
+        if (!Files.exists(versionsPath)) {
+            Files.createDirectories(versionsPath);
+            System.out.println("Pasta versions criada em: " + versionsPath);
+        }
+        
+        // Nome do arquivo da chave: <versão>.key
+        String headKeyFileName = versionNumber + ".key";
+        Path headKeyFilePath = Paths.get(versionsPath.toString(), headKeyFileName);
+        
+        // Salva a chave simétrica original do HEAD
+        Files.write(headKeyFilePath, headSecretKey.getEncoded());
+        
+        System.out.println("Chave simétrica original do HEAD salva em: versions/" + headKeyFileName + " (versão " + versionNumber + ")");
     }
     
 }

@@ -668,7 +668,7 @@ public class RepositorioService {
      * @return Próximo número de versão
      * @throws Exception Se houver erro ao processar os arquivos
      */
-    private int findNextVersionNumber(Path versionsPath) throws Exception {
+    public int findNextVersionNumber(Path versionsPath) throws Exception {
         int maxVersion = 0;
         
         try (var stream = Files.list(versionsPath)) {

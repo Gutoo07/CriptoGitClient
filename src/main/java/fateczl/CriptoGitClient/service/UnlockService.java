@@ -321,8 +321,14 @@ public class UnlockService {
             // Agora tenta descriptografar o nome do arquivo com a mesma chave
             String decryptedFileName = tryDecryptFileName(file.getFileName().toString(), symmetricKey);
             
-            // Salva o blob descriptografado na pasta .criptogit/objects
-            saveDecryptedBlob(decryptedData, decryptedFileName, file);
+            // Verifica se é o HEAD (nome é apenas um número e conteúdo é hash SHA-1)
+            if (isHeadFile(decryptedFileName, decryptedData)) {
+                // Salva o HEAD na pasta versions
+                saveDecryptedHead(decryptedData, decryptedFileName, file);
+            } else {
+                // Salva o blob descriptografado na pasta .criptogit/objects
+                saveDecryptedBlob(decryptedData, decryptedFileName, file, symmetricKey);
+            }
             
             // Apaga o arquivo criptografado original
             Files.delete(file);
@@ -387,13 +393,69 @@ public class UnlockService {
     }
     
     /**
+     * Verifica se o arquivo descriptografado é o HEAD
+     * @param decryptedFileName Nome do arquivo descriptografado
+     * @param decryptedData Conteúdo descriptografado
+     * @return true se for o HEAD, false caso contrário
+     */
+    private boolean isHeadFile(String decryptedFileName, byte[] decryptedData) {
+        try {
+            // Verifica se o nome é apenas um número (sem extensão)
+            if (!decryptedFileName.matches("^\\d+$")) {
+                return false;
+            }
+            
+            // Converte o conteúdo para string
+            String content = new String(decryptedData).trim();
+            
+            // Verifica se o conteúdo é uma hash SHA-1 de 40 dígitos hexadecimais
+            if (content.matches("^[a-f0-9]{40}$")) {
+                System.out.println("  → Detectado como HEAD: versão " + decryptedFileName + ", hash: " + content);
+                return true;
+            }
+            
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Salva o HEAD descriptografado na pasta .criptogit/versions
+     * @param decryptedData Dados descriptografados (hash do commit)
+     * @param versionNumber Número da versão (nome do arquivo)
+     * @param originalFile Arquivo original para obter o caminho do repositório
+     * @throws Exception Se houver erro ao salvar
+     */
+    private void saveDecryptedHead(byte[] decryptedData, String versionNumber, Path originalFile) throws Exception {
+        // Obtém o caminho do repositório a partir do arquivo original
+        Path repositorioPath = originalFile.getParent().getParent().getParent();
+        Path versionsPath = Paths.get(repositorioPath.toString(), ".criptogit", "versions");
+        
+        // Cria a pasta versions se não existir
+        if (!Files.exists(versionsPath)) {
+            Files.createDirectories(versionsPath);
+        }
+        
+        // Salva o HEAD na pasta versions com o número da versão como nome
+        Path headFile = Paths.get(versionsPath.toString(), versionNumber);
+        if (!Files.exists(headFile)) {
+            Files.write(headFile, decryptedData);
+            System.out.println("  → HEAD salvo em: .criptogit/versions/" + versionNumber);
+        } else {
+            System.out.println("  → HEAD já existe em: .criptogit/versions/" + versionNumber);
+        }
+    }
+    
+    /**
      * Salva o blob descriptografado na pasta .criptogit/objects seguindo o padrão do comando add
      * @param decryptedData Dados descriptografados
      * @param decryptedFileName Nome do arquivo descriptografado (que é a hash completa)
      * @param originalFile Arquivo original para obter o caminho do repositório
+     * @param symmetricKey Chave simétrica usada para descriptografar o blob
      * @throws Exception Se houver erro ao salvar
      */
-    private void saveDecryptedBlob(byte[] decryptedData, String decryptedFileName, Path originalFile) throws Exception {
+    private void saveDecryptedBlob(byte[] decryptedData, String decryptedFileName, Path originalFile, SecretKey symmetricKey) throws Exception {
         // Obtém o caminho do repositório a partir do arquivo original
         Path repositorioPath = originalFile.getParent().getParent().getParent();
         Path objectsPath = Paths.get(repositorioPath.toString(), ".criptogit", "objects");
@@ -418,6 +480,16 @@ public class UnlockService {
             System.out.println("  → Blob salvo em: .criptogit/objects/" + dirName + "/" + fileName);
         } else {
             System.out.println("  → Blob já existe, não foi sobrescrito: .criptogit/objects/" + dirName + "/" + fileName);
+        }
+        
+        // Salva a chave simétrica na mesma pasta do blob com o nome {hash_completa}.key
+        String keyFileName = hash + ".key";
+        Path keyFile = Paths.get(objectDir.toString(), keyFileName);
+        if (!Files.exists(keyFile)) {
+            Files.write(keyFile, symmetricKey.getEncoded());
+            System.out.println("  → Chave simétrica salva em: .criptogit/objects/" + dirName + "/" + keyFileName);
+        } else {
+            System.out.println("  → Chave simétrica já existe, não foi sobrescrita: .criptogit/objects/" + dirName + "/" + keyFileName);
         }
     }
     
@@ -497,14 +569,14 @@ public class UnlockService {
             System.out.println("Pasta wd criada em: " + wdPath);
         }
         
-        // Lê o arquivo HEAD para obter o hash do commit
-        String commitHash = readHeadFile(unlockedPath);
+        // Lê o arquivo de maior número na pasta versions (HEAD mais recente)
+        String commitHash = readLatestHeadFromVersions(repositorioPath);
         if (commitHash == null) {
-            System.err.println("⚠ Arquivo HEAD não encontrado ou vazio");
+            System.err.println("⚠ Nenhum HEAD encontrado na pasta versions");
             return;
         }
         
-        System.out.println("Hash do commit HEAD: " + commitHash);
+        System.out.println("Hash do commit HEAD (mais recente): " + commitHash);
         
         // Carrega e processa o commit (agora busca na pasta objects)
         Commit commit = loadCommit(repositorioPath, commitHash);
@@ -533,7 +605,59 @@ public class UnlockService {
     }
     
     /**
-     * Lê o arquivo HEAD para obter o hash do commit
+     * Lê o arquivo de maior número na pasta versions (HEAD mais recente)
+     * @param repositorioPath Caminho do repositório
+     * @return Hash do commit ou null se não encontrado
+     */
+    private String readLatestHeadFromVersions(String repositorioPath) {
+        try {
+            Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
+            if (!Files.exists(versionsPath)) {
+                System.out.println("✗ Pasta versions não encontrada");
+                return null;
+            }
+            
+            int maxVersion = 0;
+            String latestHeadContent = null;
+            
+            // Lista todos os arquivos na pasta versions
+            try (var stream = Files.list(versionsPath)) {
+                for (Path file : stream.collect(java.util.stream.Collectors.toList())) {
+                    if (Files.isRegularFile(file)) {
+                        String fileName = file.getFileName().toString();
+                        
+                        // Verifica se o nome do arquivo é um número (versão)
+                        try {
+                            int versionNumber = Integer.parseInt(fileName);
+                            if (versionNumber > maxVersion) {
+                                maxVersion = versionNumber;
+                                // Lê o conteúdo do arquivo (hash do commit)
+                                latestHeadContent = Files.readString(file).trim();
+                            }
+                        } catch (NumberFormatException e) {
+                            // Se não for um número, ignora o arquivo
+                            continue;
+                        }
+                    }
+                }
+            }
+            
+            if (latestHeadContent != null) {
+                System.out.println("HEAD mais recente encontrado: versão " + maxVersion + ", hash: " + latestHeadContent);
+                return latestHeadContent;
+            } else {
+                System.out.println("✗ Nenhum arquivo de versão encontrado na pasta versions");
+                return null;
+            }
+            
+        } catch (Exception e) {
+            System.out.println("✗ Erro ao ler pasta versions: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Lê o arquivo HEAD para obter o hash do commit (método antigo - mantido para compatibilidade)
      * @param unlockedPath Caminho da pasta unlocked
      * @return Hash do commit ou null se não encontrado
      */

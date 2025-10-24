@@ -7,6 +7,7 @@ public class ConsoleService {
     private final Scanner scanner = new Scanner(System.in);
     private RepositorioService repositorioService = new RepositorioService();
     private UnlockService unlockService = new UnlockService();
+    private PullService pullService = new PullService();
 
     public void run() {
         String command;
@@ -29,6 +30,11 @@ public class ConsoleService {
                     String message = scanner.nextLine();
                     repositorioService.commit(message);
                     break;
+                case "pull":
+                    System.out.print("Digite o nome do repositório: ");
+                    String repositorio = scanner.nextLine();
+                    pullService.pull(repositorio, repositorioService.getRepositorio().getPath());
+                    break;
                 case "unlock":
                     if (repositorioService.getRepositorio() == null) {
                         System.out.println("Erro: Repositório não inicializado. Execute 'init' primeiro.");
@@ -38,6 +44,9 @@ public class ConsoleService {
                     break;
                 case "exit":
                     System.out.println("Saindo...");
+                    break;
+                case "test":
+                    pullService.test();
                     break;
                 default:
                     System.out.println("Comando não reconhecido: " + command);

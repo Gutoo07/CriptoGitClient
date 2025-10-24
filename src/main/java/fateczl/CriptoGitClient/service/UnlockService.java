@@ -328,7 +328,7 @@ public class UnlockService {
             // Verifica se é o HEAD (nome é apenas um número e conteúdo é hash SHA-1)
             if (isHeadFile(decryptedFileName, decryptedData)) {
                 // Salva o HEAD na pasta versions
-                saveDecryptedHead(decryptedData, decryptedFileName, file);
+                saveDecryptedHead(decryptedData, decryptedFileName, file, symmetricKey);
             } else {
                 // Salva o blob descriptografado na pasta .criptogit/objects
                 saveDecryptedBlob(decryptedData, decryptedFileName, file, symmetricKey);
@@ -429,9 +429,10 @@ public class UnlockService {
      * @param decryptedData Dados descriptografados (hash do commit)
      * @param versionNumber Número da versão (nome do arquivo)
      * @param originalFile Arquivo original para obter o caminho do repositório
+     * @param symmetricKey Chave simétrica usada para descriptografar o HEAD
      * @throws Exception Se houver erro ao salvar
      */
-    private void saveDecryptedHead(byte[] decryptedData, String versionNumber, Path originalFile) throws Exception {
+    private void saveDecryptedHead(byte[] decryptedData, String versionNumber, Path originalFile, SecretKey symmetricKey) throws Exception {
         // Obtém o caminho do repositório a partir do arquivo original
         Path repositorioPath = originalFile.getParent().getParent().getParent();
         Path versionsPath = Paths.get(repositorioPath.toString(), ".criptogit", "versions");
@@ -448,6 +449,16 @@ public class UnlockService {
             System.out.println("  → HEAD salvo em: .criptogit/versions/" + versionNumber);
         } else {
             System.out.println("  → HEAD já existe em: .criptogit/versions/" + versionNumber);
+        }
+        
+        // Salva a chave simétrica do HEAD na pasta versions com o nome {versao}.key
+        String keyFileName = versionNumber + ".key";
+        Path keyFile = Paths.get(versionsPath.toString(), keyFileName);
+        if (!Files.exists(keyFile)) {
+            Files.write(keyFile, symmetricKey.getEncoded());
+            System.out.println("  → Chave simétrica do HEAD salva em: .criptogit/versions/" + keyFileName);
+        } else {
+            System.out.println("  → Chave simétrica do HEAD já existe, não foi sobrescrita: .criptogit/versions/" + keyFileName);
         }
     }
     

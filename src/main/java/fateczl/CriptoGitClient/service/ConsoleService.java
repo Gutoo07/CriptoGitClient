@@ -8,7 +8,10 @@ public class ConsoleService {
     private RepositorioService repositorioService = new RepositorioService();
     private UnlockService unlockService = new UnlockService();
     private PullService pullService = new PullService();
-
+    private PushService pushService = new PushService();
+    private LoginService loginService = new LoginService();
+    private Settings settings = new Settings();
+    
     public void run() {
         String command;
         try {
@@ -34,6 +37,16 @@ public class ConsoleService {
                     System.out.print("Digite o nome do repositório: ");
                     String repositorio = scanner.nextLine();
                     pullService.pull(repositorio, repositorioService.getRepositorio().getPath());
+                    break;
+                case "push":
+                    pushService.push(repositorioService.getRepositorio().getPath());
+                    break;
+                case "login":
+                    System.out.print("Digite o nome de usuário: ");
+                    String username = scanner.nextLine();
+                    System.out.print("Digite a senha: ");
+                    String password = scanner.nextLine();
+                    loginService.login(username, password, settings);
                     break;
                 case "unlock":
                     if (repositorioService.getRepositorio() == null) {

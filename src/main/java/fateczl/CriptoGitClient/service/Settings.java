@@ -12,6 +12,6 @@ public class Settings {
     }
 
     public String getServerUrl() {
-        return serverUrl;
+        return this.serverUrl;
     }
 }

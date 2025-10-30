@@ -4,7 +4,7 @@ public class Settings {
     private String serverUrl;
 
     public Settings() {
-        this.serverUrl = "http://localhost:8083/webhook";
+        this.serverUrl = "http://localhost:5000";
     }
 
     public void setServerUrl(String serverUrl) {

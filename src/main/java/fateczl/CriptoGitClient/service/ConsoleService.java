@@ -17,6 +17,9 @@ public class ConsoleService {
         try {
         do {
             command = readCommand();
+            String nickname = "";
+            String email = "";
+            String senha = "";
             switch (command) {
                 case "init":
                     System.out.print("Digite o caminho do repositório: ");
@@ -41,12 +44,21 @@ public class ConsoleService {
                 case "push":
                     pushService.push(repositorioService.getRepositorio().getPath());
                     break;
-                case "login":
-                    System.out.print("Digite o nome de usuário: ");
-                    String username = scanner.nextLine();
+                case "register":
+                    System.out.print("Digite o nickname: ");
+                    nickname = scanner.nextLine();
+                    System.out.print("Digite o email: ");
+                    email = scanner.nextLine();
                     System.out.print("Digite a senha: ");
-                    String password = scanner.nextLine();
-                    loginService.login(username, password, settings);
+                    senha = scanner.nextLine();
+                    loginService.register(nickname, email, senha, settings);
+                    break;
+                case "login":
+                    System.out.print("Digite o email: ");
+                    email = scanner.nextLine();
+                    System.out.print("Digite a senha: ");
+                    senha = scanner.nextLine();
+                    loginService.login(email, senha, settings);
                     break;
                 case "unlock":
                     if (repositorioService.getRepositorio() == null) {

@@ -75,6 +75,20 @@ public class ConsoleService {
                 case "list-remote-repositories":
                     repositorioService.listRemoteRepositories(settings);
                     break;
+                case "-help":
+                    System.out.println("add - Adiciona um arquivo ao repositório local");
+                    System.out.println("commit - Cria um commit no repositório local");
+                    System.out.println("create-remote-repository - Cria um repositório remoto");
+                    System.out.println("exit - Sai do programa");
+                    System.out.println("init - Inicializa um repositório local");
+                    System.out.println("list-remote-repositories - Lista todos os repositórios remotos");
+                    System.out.println("login - Faz login no servidor");
+                    System.out.println("pull - Puxa os commits do repositório remoto para o repositório local");
+                    System.out.println("push - Envia os commits do repositório local para o repositório remoto");
+                    System.out.println("register - Registra um novo usuário");
+                    System.out.println("test - Testa a conexão com o servidor");
+                    System.out.println("unlock - Desbloqueia o repositório local");
+                    break;
                 case "exit":
                     System.out.println("Saindo...");
                     break;
@@ -92,6 +106,7 @@ public class ConsoleService {
     }
 
     public String readCommand() {
+        System.out.println("\n-help: Lista todos os comandos disponíveis");
         System.out.print("Digite um comando: ");
         return scanner.nextLine(); 
     }

@@ -39,12 +39,10 @@ public class PushService {
         
         System.out.println("\nEncontrados " + blobs.size() + " arquivos para enviar.");
         
-        // Tenta enviar usando estratégia híbrida
-        //enviarBlobsComEstrategiaHibrida(blobs);
-        // Primeira tentativa: envio em lote
+        // Envia os blobs para o servidor, todos de uma vez
         blobService = new BlobService();
         blobService.enviarBlobsEmLote(blobs, settings.getServerUrl() + "/git/push", repositorioName);
-        System.out.println("✅ Envio em lote realizado com sucesso!");
+        System.out.println(" *** Push realizado com sucesso ***");
     }
     
     /**
@@ -59,14 +57,12 @@ public class PushService {
                 try {
                     byte[] content = Files.readAllBytes(file);
                     String hash = file.getFileName().toString();
-                    String relativePath = file.getFileName().toString();
                     
                     Blob blob = new Blob();
                     blob.setHash(hash);
                     blob.setContent(content);
                     
                     blobs.add(blob);
-                    System.out.println("Carregado: " + relativePath + " (hash: " + hash + ")");
                 } catch (IOException e) {
                     System.err.println("Erro ao carregar arquivo " + file.getFileName() + ": " + e.getMessage());
                 }

@@ -67,6 +67,11 @@ public class ConsoleService {
                     }
                     unlockService.unlock(repositorioService.getRepositorio().getPath());
                     break;
+                case "create-remote-repository":
+                    System.out.print("Digite o nome do repositório: ");
+                    String repositoryName = scanner.nextLine();
+                    repositorioService.createRemoteRepository(repositoryName, settings);
+                    break;
                 case "exit":
                     System.out.println("Saindo...");
                     break;

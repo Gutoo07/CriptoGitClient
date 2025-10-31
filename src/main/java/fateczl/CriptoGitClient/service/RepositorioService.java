@@ -10,11 +10,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class RepositorioService {
     private Repositorio repositorio;
@@ -693,6 +700,37 @@ public class RepositorioService {
         // Se não encontrou nenhum arquivo de versão, é o primeiro commit (versão 1)
         // Caso contrário, incrementa a maior versão encontrada
         return maxVersion == 0 ? 1 : maxVersion + 1;
+    }
+
+    /**
+     * Cria um repositório remoto no servidor
+     * @param repositoryName Nome do repositório
+     * @throws Exception Se houver erro ao criar o repositório remoto
+     */
+    public void createRemoteRepository(String repositoryName, Settings settings) throws Exception {
+        // Carrega o token do arquivo .token
+        String token = Files.readString(Paths.get(".token"));
+        if (token == null || token.isEmpty()) {
+            throw new Exception("Token não encontrado. Faça login para criar um repositório remoto.");
+        }
+        // Cria a URL da requisição
+        String serverUrl = settings.getServerUrl() + "/repos";
+        // Cria o corpo da requisição usando Jackson ObjectMapper
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, String> requestBodyMap = new HashMap<>();
+        requestBodyMap.put("nome", repositoryName);
+        String requestBody = objectMapper.writeValueAsString(requestBodyMap);
+        
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(serverUrl))
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .header("Content-Type", "application/json")
+            .header("Authorization", token)
+            .build();
+        // Envia a requisição
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());        
+        System.out.println(response.body());
     }
 
 }

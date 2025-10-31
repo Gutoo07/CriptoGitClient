@@ -404,8 +404,8 @@ public class UnlockService {
      */
     private boolean isHeadFile(String decryptedFileName, byte[] decryptedData) {
         try {
-            // Verifica se o nome é apenas um número (sem extensão)
-            if (!decryptedFileName.matches("^\\d+$")) {
+            // Verifica se o nome é apenas um número com ".head"
+            if (!decryptedFileName.matches("^\\d+\\.head$")) {
                 return false;
             }
             
@@ -441,7 +441,8 @@ public class UnlockService {
         if (!Files.exists(versionsPath)) {
             Files.createDirectories(versionsPath);
         }
-        
+        // Tira o ".head" do nome da versão
+        versionNumber = versionNumber.replace(".head", "");
         // Salva o HEAD na pasta versions com o número da versão como nome
         Path headFile = Paths.get(versionsPath.toString(), versionNumber);
         if (!Files.exists(headFile)) {

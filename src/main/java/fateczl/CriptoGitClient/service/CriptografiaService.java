@@ -496,12 +496,8 @@ public class CriptografiaService {
         SecretKey headSecretKey = generateSymmetricKey();
         
         // Criptografa o conteúdo do HEAD
-        byte[] encryptedHeadContent = encryptContent(headContent.getBytes(), headSecretKey);
-        
-        // Criptografa o número da versão com a mesma chave simétrica
-        byte[] encryptedVersionNumber = encryptContent(String.valueOf(versionNumber).getBytes(), headSecretKey);
-        String encryptedHeadFileName = bytesToHex(encryptedVersionNumber);
-        
+        byte[] encryptedHeadContent = encryptContent(headContent.getBytes(), headSecretKey);        
+               
         // Caminho da pasta locked
         Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
         if (!Files.exists(lockedPath)) {
@@ -509,9 +505,9 @@ public class CriptografiaService {
         }
         
         // Salva o HEAD criptografado na pasta locked
-        Path encryptedHeadFilePath = Paths.get(lockedPath.toString(), encryptedHeadFileName);
+        Path encryptedHeadFilePath = Paths.get(lockedPath.toString(), versionNumber + ".head");
         Files.write(encryptedHeadFilePath, encryptedHeadContent);
-        System.out.println("HEAD criptografado salvo em: locked/" + encryptedHeadFileName + " (versão " + versionNumber + ")");
+        System.out.println("HEAD criptografado salvo em: locked/" + versionNumber + ".head");
         
         // Criptografa a chave simétrica do HEAD com cada chave pública RSA
         for (int i = 0; i < publicKeys.size(); i++) {

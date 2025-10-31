@@ -28,26 +28,41 @@ public class ConsoleService {
                     repositorioService.init(path);
                     break;
                 case "add":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
                     System.out.print("Digite o nome do arquivo ou '.' para adicionar todos: ");
                     String filename = scanner.nextLine();
                     repositorioService.add(filename);
                     break;
                 case "clone":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
                     System.out.print("Digite o nome do repositório: ");
                     repositorio = scanner.nextLine();
                     pullService.clone(repositorio, repositorioService.getRepositorio().getPath(), settings);
                     break;
                 case "commit":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
                     System.out.print("Digite a mensagem do commit: ");
                     String message = scanner.nextLine();
                     repositorioService.commit(message);
                     break;
                 case "pull":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
                     System.out.print("Digite o nome do repositório: ");
                     repositorio = scanner.nextLine();
                     pullService.pull(repositorio, repositorioService.getRepositorio().getPath());
                     break;
                 case "push":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
                     pushService.push(repositorioService.getRepositorio().getPath(), repositorioService.getRepositorio().getName(), settings);
                     break;
                 case "register":
@@ -67,8 +82,7 @@ public class ConsoleService {
                     loginService.login(email, senha, settings);
                     break;
                 case "unlock":
-                    if (repositorioService.getRepositorio() == null) {
-                        System.out.println("Erro: Repositório não inicializado. Execute 'init' primeiro.");
+                    if (!checkRepositorioInicializado()) {
                         break;
                     }
                     unlockService.unlock(repositorioService.getRepositorio().getPath());
@@ -120,6 +134,14 @@ public class ConsoleService {
 
     public void close() {
         scanner.close();
+    }
+    
+    private boolean checkRepositorioInicializado() {
+        if (repositorioService.getRepositorio() == null) {
+            System.err.println("\nErro: Repositório não inicializado. Execute 'init' primeiro.");
+            return false;
+        }
+        return true;
     }
     
 }

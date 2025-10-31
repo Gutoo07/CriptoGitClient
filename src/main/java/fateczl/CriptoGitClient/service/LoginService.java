@@ -1,10 +1,14 @@
 package fateczl.CriptoGitClient.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class LoginService {
 
@@ -34,5 +38,13 @@ public class LoginService {
             .build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         System.out.println(response.body());
+        
+        // Converte o JSON para JsonNode (objeto genérico)
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(response.body());
+        String token = jsonNode.get("token").asText();
+        
+        // Salva o token no arquivo .token
+        Files.writeString(Paths.get(".token"), token);
     }
 }

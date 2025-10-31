@@ -17,6 +17,7 @@ public class ConsoleService {
         try {
         do {
             command = readCommand();
+            String repositorio = "";
             String nickname = "";
             String email = "";
             String senha = "";
@@ -31,6 +32,11 @@ public class ConsoleService {
                     String filename = scanner.nextLine();
                     repositorioService.add(filename);
                     break;
+                case "clone":
+                    System.out.print("Digite o nome do repositório: ");
+                    repositorio = scanner.nextLine();
+                    pullService.clone(repositorio, repositorioService.getRepositorio().getPath(), settings);
+                    break;
                 case "commit":
                     System.out.print("Digite a mensagem do commit: ");
                     String message = scanner.nextLine();
@@ -38,11 +44,11 @@ public class ConsoleService {
                     break;
                 case "pull":
                     System.out.print("Digite o nome do repositório: ");
-                    String repositorio = scanner.nextLine();
+                    repositorio = scanner.nextLine();
                     pullService.pull(repositorio, repositorioService.getRepositorio().getPath());
                     break;
                 case "push":
-                    pushService.push(repositorioService.getRepositorio().getPath());
+                    pushService.push(repositorioService.getRepositorio().getPath(), repositorioService.getRepositorio().getName(), settings);
                     break;
                 case "register":
                     System.out.print("Digite o nickname: ");
@@ -69,8 +75,8 @@ public class ConsoleService {
                     break;
                 case "create-remote-repository":
                     System.out.print("Digite o nome do repositório: ");
-                    String repositoryName = scanner.nextLine();
-                    repositorioService.createRemoteRepository(repositoryName, settings);
+                    repositorio = scanner.nextLine();
+                    repositorioService.createRemoteRepository(repositorio, settings);
                     break;
                 case "list-remote-repositories":
                     repositorioService.listRemoteRepositories(settings);
@@ -79,6 +85,7 @@ public class ConsoleService {
                     System.out.println("add - Adiciona um arquivo ao repositório local");
                     System.out.println("commit - Cria um commit no repositório local");
                     System.out.println("create-remote-repository - Cria um repositório remoto");
+                    System.out.println("clone - Clona um repositório remoto para o repositório local");
                     System.out.println("exit - Sai do programa");
                     System.out.println("init - Inicializa um repositório local");
                     System.out.println("list-remote-repositories - Lista todos os repositórios remotos");

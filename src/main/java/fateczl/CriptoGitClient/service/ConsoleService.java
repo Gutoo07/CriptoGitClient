@@ -72,6 +72,9 @@ public class ConsoleService {
                     String repositoryName = scanner.nextLine();
                     repositorioService.createRemoteRepository(repositoryName, settings);
                     break;
+                case "list-remote-repositories":
+                    repositorioService.listRemoteRepositories(settings);
+                    break;
                 case "exit":
                     System.out.println("Saindo...");
                     break;

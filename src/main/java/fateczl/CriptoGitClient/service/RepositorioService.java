@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.HashMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 public class RepositorioService {
     private Repositorio repositorio;
@@ -733,4 +734,34 @@ public class RepositorioService {
         System.out.println(response.body());
     }
 
+    /**
+     * Lista todos os repositórios remotos do servidor
+     */
+    public void listRemoteRepositories(Settings settings) throws Exception {
+        // Carrega o token do arquivo .token
+        String token = Files.readString(Paths.get(".token"));
+        if (token == null || token.isEmpty()) {
+            throw new Exception("Token não encontrado. Faça login para listar os repositórios remotos.");
+        }
+        // Cria a URL da requisição
+        String serverUrl = settings.getServerUrl() + "/repos";
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(serverUrl))
+            .GET()
+            .header("Authorization", token)
+            .build();
+        // Envia a requisição
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        // Converte o JSON para JsonNode (objeto genérico)
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(response.body());
+        System.out.println("\n*** Repositórios remotos ***");
+        for (JsonNode repo : jsonNode) {
+            System.out.println("--------------------------------");
+            System.out.println(repo.get("nome").asText());
+        }
+        System.out.println("--------------------------------\n");
+    }
 }

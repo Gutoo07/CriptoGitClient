@@ -39,11 +39,13 @@ public class RepositorioService {
         Path directoryPath = Paths.get(path);
         
         if (!Files.exists(directoryPath)) {
-            throw new IllegalArgumentException("Diretório não existe.");
+            System.err.println("\nErro: Diretório não existe.");
+            return;
         }
         
         if (!Files.isDirectory(directoryPath)) {
-            throw new IllegalArgumentException("O caminho especificado não é um diretório.");
+            System.err.println("\nErro: O caminho especificado não é um diretório.");
+            return;
         }
         
         repositorio = new Repositorio();
@@ -146,12 +148,14 @@ public class RepositorioService {
         
         // Se o arquivo não for encontrado, lança uma exceção
         if (filePath == null) {
-            throw new IOException("Arquivo não encontrado: " + filename);
+            System.out.println("Arquivo não encontrado: " + filename);
+            return;
         }
         
         // Se o caminho especificado não for um arquivo, lança uma exceção
         if (!Files.isRegularFile(filePath)) {
-            throw new IOException("O caminho especificado não é um arquivo: " + filename);
+            System.out.println("O caminho especificado não é um arquivo: " + filename);
+            return;
         }
         
         MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -247,20 +251,24 @@ public class RepositorioService {
     public void commit(String message) throws Exception {
         // Verifica se o diretório .criptogit existe
         if (!Files.exists(Paths.get(repositorio.getPath(), ".criptogit"))) {
-            throw new IOException("Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
+            System.err.println("\nErro: Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
+            return;
         }
         // Verifica se o diretório objects existe
         Path objectsPath = Paths.get(repositorio.getPath(), ".criptogit", "objects");
         if (!Files.exists(objectsPath)) {            
-            throw new IOException("Diretório objects não existe. Execute o comando init para criar um repositório CriptoGit.");
+            System.err.println("\nErro: Diretório objects não existe. Execute o comando init para criar um repositório CriptoGit.");
+            return;
         }
         // Verifica se a pasta keys existe e possui chaves simétricas
         Path keysPath = Paths.get(repositorio.getPath(), ".criptogit", "keys");
         if (!Files.exists(keysPath)) {
-            throw new IOException("Pasta keys não existe. Execute o comando init para criar um repositório CriptoGit.");
+            System.err.println("\nErro: Pasta keys não existe. Execute o comando init para criar um repositório CriptoGit.");
+            return;
         }
         if (Files.list(keysPath).count() == 0) {
-            throw new IOException("Pasta keys está vazia. Crie seu par de chaves pública e privada com os comandos: openssl genrsa -out private_key.pem 2048 && openssl rsa -in private_key.pem -pubout -out public_key.pem");
+            System.err.println("\nErro: Pasta keys está vazia. Crie seu par de chaves pública e privada com os comandos: openssl genrsa -out private_key.pem 2048 && openssl rsa -in private_key.pem -pubout -out public_key.pem");
+            return;
         }
         // Cria o objeto de commit com os metadados
         Commit commit = new Commit();
@@ -470,7 +478,8 @@ public class RepositorioService {
         Path criptogitPath = Paths.get(path, ".criptogit");
         // Verifica se o diretório .criptogit existe
         if (!Files.exists(criptogitPath)) {
-            throw new IOException("Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
+            System.err.println("\nErro: Diretório .criptogit não existe. Execute o comando init para criar um repositório CriptoGit.");
+            return;
         }
         // Verifica se o diretório objects existe
         Path objectsPath = Paths.get(path, ".criptogit", "objects");

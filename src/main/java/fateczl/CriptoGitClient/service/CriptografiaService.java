@@ -1,12 +1,18 @@
 package fateczl.CriptoGitClient.service;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.security.PublicKey;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Set;
 import java.util.HashSet;
@@ -16,6 +22,8 @@ import java.util.Random;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 public class CriptografiaService {
@@ -555,5 +563,57 @@ public class CriptografiaService {
         
         System.out.println("Chave simétrica original do HEAD salva em: versions/" + headKeyFileName + " (versão " + versionNumber + ")");
     }
-    
+    /**
+     * Recebe um array de chaves públicas do servidor e salva as que ainda não existem na pasta keys
+     * @param settings Configurações do cliente
+     * @throws Exception Se houver erro ao salvar as chaves
+     */
+    public void loadPublicKeysFromServer(String repositorioPath, String repositorioId, Settings settings) throws Exception {
+        String serverUrl = settings.getServerUrl();
+        String url = serverUrl + "/chaves_publicas?repo_id=" + repositorioId;
+        // Faz a requisição GET para o servidor, informando o token no header e o repositorioId no body
+        String token = Files.readString(Paths.get(".token"));
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", token)
+            .GET()
+            .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+        
+        // Cria a pasta keys se não existir
+        Path keysPath = Paths.get(repositorioPath, ".criptogit", "keys");
+        if (!Files.exists(keysPath)) {
+            Files.createDirectories(keysPath);
+        }
+        
+        // Faz o parsing do JSON
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+        
+        // Função auxiliar para salvar uma chave pública
+        MessageDigest md = MessageDigest.getInstance("SHA-1");
+        
+        // Verifica se é um array
+        if (jsonNode.isArray()) {
+            // Se for um array, processa cada elemento
+            for (JsonNode node : jsonNode) {
+                if (node.has("chave_publica")) {
+                    String chavePublica = node.get("chave_publica").asText();
+                    // O nome do arquivo da chave será os 5 primerios caracteres da chave em si
+                    String fileName = "public_key_" + chavePublica.substring(0, 5) + ".pem";
+                    Path keyFilePath = Paths.get(keysPath.toString(), fileName);
+                    
+                    // Verifica se a chave já existe antes de salvar
+                    if (!Files.exists(keyFilePath)) {
+                        Files.write(keyFilePath, chavePublica.getBytes(StandardCharsets.UTF_8));
+                        System.out.println("Chave pública salva: " + fileName);
+                    } else {
+                        System.out.println("Chave pública já existe, pulando: " + fileName);
+                    }
+                }
+            }
+        }
+    }
 }

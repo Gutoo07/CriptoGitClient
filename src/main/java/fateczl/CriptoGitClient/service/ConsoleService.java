@@ -10,6 +10,7 @@ public class ConsoleService {
     private PullService pullService = new PullService();
     private PushService pushService = new PushService();
     private LoginService loginService = new LoginService();
+    private CriptografiaService criptografiaService = new CriptografiaService();
     private Settings settings = new Settings();
     
     public void run() {
@@ -35,6 +36,14 @@ public class ConsoleService {
                     System.out.print("Digite o nome do arquivo ou '.' para adicionar todos: ");
                     String filename = scanner.nextLine();
                     repositorioService.add(filename);
+                    break;
+                case "load-public-keys":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
+                    System.out.print("Digite o ID do repositório remoto: ");
+                    repositorioId = scanner.nextLine();
+                    criptografiaService.loadPublicKeysFromServer(repositorioService.getRepositorio().getPath(), repositorioId, settings);
                     break;
                 case "clone":
                     if (!checkRepositorioInicializado()) {

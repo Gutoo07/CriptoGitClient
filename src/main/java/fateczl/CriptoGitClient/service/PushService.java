@@ -21,7 +21,7 @@ public class PushService {
     @Autowired
     private Settings settings;
     
-    public void push(String repositorioPath, String repositorioName, Settings settings) throws Exception {
+    public void push(String repositorioPath, String repositorioId, Settings settings) throws Exception {
         // Envia os arquivos da pasta locked para o servidor
         Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
         if (!Files.exists(lockedPath)) {
@@ -41,7 +41,7 @@ public class PushService {
         
         // Envia os blobs para o servidor, todos de uma vez
         blobService = new BlobService();
-        blobService.enviarBlobsEmLote(blobs, settings.getServerUrl() + "/git/push", repositorioName);
+        blobService.enviarBlobsEmLote(blobs, settings.getServerUrl() + "/git/push", repositorioId);
         System.out.println(" *** Push realizado com sucesso ***");
     }
     

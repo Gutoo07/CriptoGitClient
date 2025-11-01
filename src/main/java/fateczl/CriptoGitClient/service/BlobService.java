@@ -51,11 +51,11 @@ public class BlobService {
      * 
      * @param blobs Lista de blobs para enviar
      * @param serverUrl URL do servidor
-     * @param repositorioName Nome do repositório a ser enviado junto com o ZIP
+     * @param repositorioId ID do repositório a ser enviado junto com o ZIP
      * @return ResponseEntity com a resposta do servidor
      * @throws Exception se houver erro na requisição
      */
-    public ResponseEntity<String> enviarBlobsEmLote(List<Blob> blobs, String serverUrl, String repositorioName) throws Exception {
+    public ResponseEntity<String> enviarBlobsEmLote(List<Blob> blobs, String serverUrl, String repositorioId) throws Exception {
         // Validações básicas
         if (blobs == null || blobs.isEmpty()) {
             throw new IllegalArgumentException("Lista de blobs não pode ser nula ou vazia");
@@ -120,7 +120,7 @@ public class BlobService {
             // Preparar multipart form data
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("zip_file", zipResource);
-            body.add("repo_name", repositorioName);
+            body.add("repo_id", repositorioId);
             
             // Preparar headers para multipart/form-data
             HttpHeaders headers = new HttpHeaders();

@@ -21,6 +21,7 @@ public class ConsoleService {
             String nickname = "";
             String email = "";
             String senha = "";
+            String repositorioId = "";
             switch (command) {
                 case "init":
                     System.out.print("Digite o caminho do repositório: ");
@@ -55,15 +56,17 @@ public class ConsoleService {
                     if (!checkRepositorioInicializado()) {
                         break;
                     }
-                    System.out.print("Digite o nome do repositório: ");
-                    repositorio = scanner.nextLine();
-                    pullService.pull(repositorio, repositorioService.getRepositorio().getPath());
+                    System.out.print("Digite o ID do repositório remoto: ");
+                    repositorioId = scanner.nextLine();
+                    pullService.pull(repositorioId, repositorioService.getRepositorio().getPath(), settings);
                     break;
                 case "push":
                     if (!checkRepositorioInicializado()) {
                         break;
                     }
-                    pushService.push(repositorioService.getRepositorio().getPath(), repositorioService.getRepositorio().getName(), settings);
+                    System.out.print("Digite o ID do repositório remoto: ");
+                    repositorioId = scanner.nextLine();
+                    pushService.push(repositorioService.getRepositorio().getPath(), repositorioId, settings);
                     break;
                 case "register":
                     System.out.print("Digite o nickname: ");

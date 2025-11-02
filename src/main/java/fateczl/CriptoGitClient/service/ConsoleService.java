@@ -7,12 +7,10 @@ public class ConsoleService {
     private final Scanner scanner = new Scanner(System.in);
     RepositorioService repositorioService = new RepositorioService();
     FileService fileService = new FileService();
-    TreeService treeService = new TreeService();
     UnlockService unlockService = new UnlockService();
     PullService pullService = new PullService();
     PushService pushService = new PushService();
     LoginService loginService = new LoginService();
-    VersionService versionService = new VersionService();
     CriptografiaService criptografiaService = new CriptografiaService();
     CommitService commitService = new CommitService();
     CloneService cloneService = new CloneService();

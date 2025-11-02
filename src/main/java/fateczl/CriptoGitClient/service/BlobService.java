@@ -2,7 +2,6 @@ package fateczl.CriptoGitClient.service;
 
 import fateczl.CriptoGitClient.model.Blob;
 import org.springframework.http.*;
-import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.core.io.ByteArrayResource;
@@ -12,8 +11,6 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.stream.Collectors;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
 import java.io.ByteArrayOutputStream;
@@ -21,7 +18,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-@Service
 public class BlobService {
     
     private final RestTemplate restTemplate;

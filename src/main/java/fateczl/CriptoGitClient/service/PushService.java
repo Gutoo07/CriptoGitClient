@@ -1,8 +1,6 @@
 package fateczl.CriptoGitClient.service;
 
 import fateczl.CriptoGitClient.model.Blob;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,17 +8,19 @@ import java.nio.file.Paths;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
-@Service
 public class PushService {
     
-    @Autowired
+    
     private BlobService blobService;
     
-    @Autowired
-    private Settings settings;
-    
+    /**
+     * Envia os arquivos da pasta locked para o servidor
+     * @param repositorioPath Caminho do repositório
+     * @param repositorioId ID do repositório
+     * @param settings Configurações do cliente
+     * @throws Exception Se houver erro ao enviar os arquivos
+     */
     public void push(String repositorioPath, String repositorioId, Settings settings) throws Exception {
         // Envia os arquivos da pasta locked para o servidor
         Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");

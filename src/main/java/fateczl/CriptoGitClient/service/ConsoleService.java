@@ -5,14 +5,19 @@ import java.util.Scanner;
 
 public class ConsoleService {
     private final Scanner scanner = new Scanner(System.in);
-    private RepositorioService repositorioService = new RepositorioService();
-    private UnlockService unlockService = new UnlockService();
-    private PullService pullService = new PullService();
-    private PushService pushService = new PushService();
-    private LoginService loginService = new LoginService();
-    private CriptografiaService criptografiaService = new CriptografiaService();
-    private Settings settings = new Settings();
-    
+    RepositorioService repositorioService = new RepositorioService();
+    FileService fileService = new FileService();
+    TreeService treeService = new TreeService();
+    UnlockService unlockService = new UnlockService();
+    PullService pullService = new PullService();
+    PushService pushService = new PushService();
+    LoginService loginService = new LoginService();
+    VersionService versionService = new VersionService();
+    CriptografiaService criptografiaService = new CriptografiaService();
+    CommitService commitService = new CommitService();
+    CloneService cloneService = new CloneService();
+    Settings settings = new Settings();
+
     public void run() {
         String command;
         try {
@@ -35,7 +40,9 @@ public class ConsoleService {
                     }
                     System.out.print("Digite o nome do arquivo ou '.' para adicionar todos: ");
                     String filename = scanner.nextLine();
-                    repositorioService.add(filename);
+                    fileService.setRepositorioPath(repositorioService.getRepositorio().getPath());
+                    fileService.setIndex(repositorioService.getIndex());
+                    fileService.add(filename);
                     break;
                 case "load-public-keys":
                     if (!checkRepositorioInicializado()) {
@@ -51,7 +58,7 @@ public class ConsoleService {
                     }
                     System.out.print("Digite o nome do repositório: ");
                     repositorio = scanner.nextLine();
-                    pullService.clone(repositorio, repositorioService.getRepositorio().getPath(), settings);
+                    cloneService.clone(repositorio, repositorioService.getRepositorio().getPath(), settings);
                     break;
                 case "commit":
                     if (!checkRepositorioInicializado()) {
@@ -59,7 +66,9 @@ public class ConsoleService {
                     }
                     System.out.print("Digite a mensagem do commit: ");
                     String message = scanner.nextLine();
-                    repositorioService.commit(message);
+                    commitService.setRepositorioPath(repositorioService.getRepositorio().getPath());
+                    commitService.setIndex(repositorioService.getIndex());
+                    commitService.commit(message);
                     break;
                 case "pull":
                     if (!checkRepositorioInicializado()) {
@@ -149,7 +158,7 @@ public class ConsoleService {
     }
     
     private boolean checkRepositorioInicializado() {
-        if (repositorioService.getRepositorio() == null) {
+        if (repositorioService.getRepositorio().getPath() == null || repositorioService.getRepositorio().getPath().isEmpty()) {
             System.err.println("\nErro: Repositório não inicializado. Execute 'init' primeiro.");
             return false;
         }

@@ -31,6 +31,8 @@ public class CriptografiaService {
     private Set<String> usedNames = new HashSet<>();
     private Random random = new SecureRandom();
     private List<PublicKey> publicKeys = new ArrayList<>();
+    private VersionService versionService;
+
     
     /**
      * Criptografa todos os blobs referenciados em um commit
@@ -496,8 +498,8 @@ public class CriptografiaService {
             System.out.println("Pasta versions criada em: " + versionsPath);
         }
         
-        RepositorioService repositorioService = new RepositorioService();
-        int versionNumber = repositorioService.findNextVersionNumber(versionsPath);
+        versionService = new VersionService();
+        int versionNumber = versionService.findNextVersionNumber(versionsPath);
         System.out.println("Versão do HEAD: " + versionNumber);
         
         // Gera uma chave simétrica específica para o HEAD

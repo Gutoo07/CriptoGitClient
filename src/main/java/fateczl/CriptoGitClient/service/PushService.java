@@ -13,7 +13,7 @@ public class PushService {
     
     
     private BlobService blobService;
-    
+
     /**
      * Envia os arquivos da pasta locked para o servidor
      * @param repositorioPath Caminho do repositório
@@ -43,10 +43,30 @@ public class PushService {
         blobService = new BlobService();
         blobService.enviarBlobsEmLote(blobs, settings.getServerUrl() + "/git/push", repositorioId);
         System.out.println(" *** Push realizado com sucesso ***");
+
+        System.out.println("\nApagando arquivos da pasta locked...");
+        try {
+            try (var files = Files.list(lockedPath)) {
+                files.filter(Files::isRegularFile)
+                    .forEach(file -> {
+                        try {
+                            Files.delete(file);
+                        } catch (IOException e) {
+                            System.err.println("Erro ao apagar arquivo " + file.getFileName() + ": " + e.getMessage());
+                        }
+                    });
+            }
+            System.out.println(" *** Arquivos apagados com sucesso ***");
+        } catch (IOException e) {
+            throw new IOException("Erro ao listar arquivos da pasta locked: " + e.getMessage(), e);
+        }
     }
     
     /**
      * Carrega todos os arquivos da pasta locked e os converte para Blobs
+     * @param lockedPath Caminho da pasta locked
+     * @return Lista de Blobs
+     * @throws IOException Se houver erro ao carregar os arquivos
      */
     private List<Blob> carregarBlobsDaPastaLocked(Path lockedPath) throws IOException {
         List<Blob> blobs = new ArrayList<>();

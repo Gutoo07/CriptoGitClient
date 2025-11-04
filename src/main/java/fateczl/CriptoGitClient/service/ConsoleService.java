@@ -50,6 +50,12 @@ public class ConsoleService {
                     repositorioId = scanner.nextLine();
                     criptografiaService.loadPublicKeysFromServer(repositorioService.getRepositorio().getPath(), repositorioId, settings);
                     break;
+                case "allow-new-collaborators":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
+                    criptografiaService.encryptSymmetricKeysWithNewPublicKeys(repositorioService.getRepositorio().getPath());
+                    break;
                 case "clone":
                     if (!checkRepositorioInicializado()) {
                         break;

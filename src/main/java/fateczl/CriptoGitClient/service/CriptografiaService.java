@@ -12,7 +12,6 @@ import java.net.http.HttpResponse;
 import java.security.SecureRandom;
 import java.security.PublicKey;
 import java.security.KeyFactory;
-import java.security.MessageDigest;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Set;
 import java.util.HashSet;
@@ -22,6 +21,7 @@ import java.util.Random;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -32,7 +32,11 @@ public class CriptografiaService {
     private Random random = new SecureRandom();
     private List<PublicKey> publicKeys = new ArrayList<>();
     private VersionService versionService;
+    private KeyService keyService;
 
+    public CriptografiaService() {
+        this.keyService = new KeyService();
+    }
     
     /**
      * Criptografa todos os blobs referenciados em um commit
@@ -565,6 +569,143 @@ public class CriptografiaService {
         
         System.out.println("Chave simétrica original do HEAD salva em: versions/" + headKeyFileName + " (versão " + versionNumber + ")");
     }
+
+    /**
+     * Criptografa todas as chaves simétricas na pasta objects com as novas chaves públicas
+     * @param repositorioPath Caminho do repositório
+     * @throws Exception Se houver erro na criptografia
+     */
+    public void encryptSymmetricKeysWithNewPublicKeys(String repositorioPath) throws Exception {
+        System.out.println("\nIniciando criptografia de chaves simétricas com novas chaves públicas...\n");
+        
+        // Confere se existe a pasta keys
+        Path keysPath = Paths.get(repositorioPath, ".criptogit", "keys");
+        if (!Files.exists(keysPath)) {
+            System.out.println("Pasta keys não encontrada.");
+            return;
+        }
+        
+        // 1. Carrega chaves públicas que começam com "new_"
+        List<Path> newPublicKeyFiles = new ArrayList<>();
+        List<PublicKey> newPublicKeys = new ArrayList<>();
+        
+        try (var stream = Files.list(keysPath)) {
+            for (Path keyFile : stream.collect(java.util.stream.Collectors.toList())) {
+                String fileName = keyFile.getFileName().toString();
+                // Processa apenas arquivos de chave pública que começam com "new_" e terminam com ".pem"
+                if (fileName.startsWith("new_") && fileName.endsWith(".pem")) {
+                    try {
+                        PublicKey publicKey = loadPublicKeyFromFile(keyFile);
+                        // Adiciona o caminho do arquivo e a chave pública à lista
+                        newPublicKeyFiles.add(keyFile);
+                        newPublicKeys.add(publicKey);
+                        System.out.println(" - Nova chave pública carregada: " + fileName);
+                    } catch (Exception e) {
+                        System.err.println("Erro ao carregar chave pública " + fileName + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+        // Se não existem novas chaves públicas, retorna
+        if (newPublicKeys.isEmpty()) {
+            System.out.println("Não existem novas chaves públicas");
+            return;
+        }
+        
+        System.out.println("Total de novas chaves públicas carregadas: " + newPublicKeys.size());
+        
+        // Confere se existe a pasta objects
+        Path objectsPath = Paths.get(repositorioPath, ".criptogit", "objects");
+        if (!Files.exists(objectsPath)) {
+            throw new Exception("Erro: pasta .criptogit/objects não encontrada.");
+        }
+        
+        // 2. Busca todos os arquivos .key na pasta objects
+        List<Path> symmetricKeyFiles = new ArrayList<>();
+        try (var stream = Files.walk(objectsPath)) {
+            stream.filter(Files::isRegularFile)
+                  .filter(path -> path.getFileName().toString().endsWith(".key"))
+                  .forEach(symmetricKeyFiles::add);
+        }
+
+        // Confere se existe a pasta versions
+        Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
+        if (!Files.exists(versionsPath)) {
+            throw new Exception("Erro: pasta .criptogit/versions não encontrada.");
+        }        
+        
+        // 3. Busca todos os arquivos .key na pasta versions
+        try (var stream = Files.walk(versionsPath)) {
+            stream.filter(Files::isRegularFile)
+                  .filter(path -> path.getFileName().toString().endsWith(".key"))
+                  .forEach(symmetricKeyFiles::add);
+        }
+        
+        // Se não existem chaves simétricas, retorna
+        if (symmetricKeyFiles.isEmpty()) {
+            System.out.println("Nenhuma chave simétrica encontrada na pasta objects");
+            return;
+        }
+        
+        System.out.println("Total de chaves simétricas encontradas: " + symmetricKeyFiles.size());
+        
+        // 4. Criptografa cada chave simétrica com cada nova chave pública
+        Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
+        if (!Files.exists(lockedPath)) {
+            Files.createDirectories(lockedPath);
+        }
+        
+        int totalEncrypted = 0;
+        // Para cada arquivo de chave simétrica
+        for (Path keyFile : symmetricKeyFiles) {
+            // Lê o conteúdo da chave simétrica
+            byte[] keyContent = Files.readAllBytes(keyFile);
+            
+            // Reconstrói a SecretKey a partir dos bytes
+            SecretKey secretKey = new SecretKeySpec(keyContent, "AES");
+            
+            // Obtém o nome do arquivo
+            String keyFileName = keyFile.getFileName().toString();
+            
+            // Para cada nova chave pública, criptografa a chave simétrica
+            // e salva na pasta locked
+            for (int i = 0; i < newPublicKeys.size(); i++) {
+                PublicKey publicKey = newPublicKeys.get(i);
+                
+                // Criptografa o conteúdo da chave simétrica com a chave pública
+                byte[] encryptedKeyContent = encryptSymmetricKeyWithPublicKey(secretKey, publicKey);
+                
+                // Gera nome único para a chave simétrica criptografada
+                String encryptedFileName = generateUniqueName();
+                
+                // Salva a versão criptografada na pasta locked
+                Path encryptedKeyFilePath = Paths.get(lockedPath.toString(), encryptedFileName);
+                Files.write(encryptedKeyFilePath, encryptedKeyContent);
+                
+                totalEncrypted++;
+                System.out.println("Chave simétrica criptografada: " + keyFileName + 
+                                 " -> locked/" + encryptedFileName + 
+                                 " (chave pública " + (i + 1) + "/" + newPublicKeys.size() + ")");
+            }
+        }
+        
+        System.out.println("Total de chaves simétricas criptografadas: " + totalEncrypted);
+        
+        // 5. Renomeia as chaves públicas removendo o prefixo "new_"
+        for (Path keyFile : newPublicKeyFiles) {
+            String fileName = keyFile.getFileName().toString();
+            String newFileName = fileName.replaceFirst("^new_", "");
+            Path newKeyFilePath = Paths.get(keysPath.toString(), newFileName);
+            
+            // Move (renomeia) o arquivo
+            Files.move(keyFile, newKeyFilePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Chave pública renomeada: " + fileName + " -> " + newFileName);
+        }
+        
+        // 6. Mensagem final
+        System.out.println("\n*** Execute o comando push para devolver as novas chaves ao repositório e permitir o acesso dos novos colaboradores. ***\n");
+    }
+    
     /**
      * Recebe um array de chaves públicas do servidor e salva as que ainda não existem na pasta keys
      * @param settings Configurações do cliente
@@ -594,21 +735,18 @@ public class CriptografiaService {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(responseBody);
         
-        // Função auxiliar para salvar uma chave pública
-        MessageDigest md = MessageDigest.getInstance("SHA-1");
-        
         // Verifica se é um array
         if (jsonNode.isArray()) {
             // Se for um array, processa cada elemento
             for (JsonNode node : jsonNode) {
                 if (node.has("chave_publica")) {
                     String chavePublica = node.get("chave_publica").asText();
-                    // O nome do arquivo da chave será os 5 primerios caracteres da chave em si
-                    String fileName = "public_key_" + chavePublica.substring(0, 5) + ".pem";
+                    // O nome do arquivo da chave será os 5 primerios caracteres depois da primeira "/"
+                    String fileName = "new_public_key_" + chavePublica.substring(chavePublica.indexOf("/") + 1, chavePublica.indexOf("/") + 6) + ".pem";
                     Path keyFilePath = Paths.get(keysPath.toString(), fileName);
                     
                     // Verifica se a chave já existe antes de salvar
-                    if (!Files.exists(keyFilePath)) {
+                    if (!keyService.exists(keysPath, chavePublica)) {
                         Files.write(keyFilePath, chavePublica.getBytes(StandardCharsets.UTF_8));
                         System.out.println("Chave pública salva: " + fileName);
                     } else {

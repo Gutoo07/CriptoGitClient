@@ -1,5 +1,6 @@
 package fateczl.CriptoGitClient.service;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -146,5 +147,35 @@ public class KeyService {
                 System.out.println("Nenhum arquivo encontrado na pasta keys para remover");
             }
         }
+    }
+
+    public boolean exists(Path keysPath, String keyContent) {
+        // Lista todos os arquivos na pasta keys
+        boolean exists = false;
+        // Remove as quebras de linha e espaços do conteúdo da chave
+        keyContent = keyContent.replaceAll("\\s", "");
+        try (var stream = Files.list(keysPath)) {
+            for (Path keyFile : stream.collect(java.util.stream.Collectors.toList())) {
+                if (Files.isRegularFile(keyFile)) {
+                    // Lê o conteúdo do arquivo
+                    byte[] keyData = Files.readAllBytes(keyFile);
+                    // Converte o conteúdo do arquivo para uma string
+                    String keyContentFile = new String(keyData);
+                    keyContentFile = keyContentFile.replace("-----BEGIN PUBLIC KEY-----", "")
+                        .replace("-----END PUBLIC KEY-----", "")
+                        .replaceAll("\\s", "");
+                    // Compara o conteúdo do arquivo com o conteúdo passado como parâmetro
+                    if (keyContentFile.equals(keyContent)) {
+                        exists = true;
+                        break;
+                    }
+                }
+            }
+        }
+        catch (IOException e) {
+            System.out.println("Erro ao listar arquivos na pasta keys: " + e.getMessage());
+            exists = false;
+        }
+        return exists;
     }
 }

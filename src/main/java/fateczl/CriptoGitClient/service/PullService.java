@@ -16,6 +16,8 @@ import java.io.ByteArrayInputStream;
 
 public class PullService {
 
+    private KeyService keyService;
+
     /**
      * Puxa um repositório remoto para o repositório local
      * No momento, o pull realiza a mesma ação de um clone.
@@ -26,7 +28,8 @@ public class PullService {
      */
     public void pull(String repositorioId, String repositorioPath, Settings settings) throws Exception {
         // Carrega a chave pública do usuário
-        String publicKey = getMyPublicKey(repositorioPath);
+        keyService = new KeyService();
+        String publicKey = keyService.getMyPublicKey(repositorioPath);
         // Carrega o token do arquivo .token
         String token = Files.readString(Paths.get(".token"));
         if (token == null || token.isEmpty()) {
@@ -82,23 +85,7 @@ public class PullService {
         System.out.println(response.body());
     }
 
-    /**
-     * Carrega a chave pública do usuário
-     * @param repositorioPath Caminho do repositório
-     * @return Chave pública
-     * @throws Exception Se houver erro ao carregar a chave pública
-     */
-    public String getMyPublicKey(String repositorioPath) throws Exception {
-        // Lê o arquivo da chave pública
-        byte[] publicKeyBytes = Files.readAllBytes(Paths.get(repositorioPath, ".criptogit", "keys", "public_key.pem"));
-        
-        // Remove headers e footers PEM se existirem
-        String publicKeyContent = new String(publicKeyBytes);
-        publicKeyContent = publicKeyContent.replace("-----BEGIN PUBLIC KEY-----", "")
-                                          .replace("-----END PUBLIC KEY-----", "")
-                                          .replaceAll("\\s", "");
-        return publicKeyContent;
-    }
+    
     
     /**
      * Extrai um arquivo zip para o diretório .criptogit/clone

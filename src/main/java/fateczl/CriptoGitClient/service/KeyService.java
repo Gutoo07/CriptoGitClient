@@ -40,6 +40,24 @@ public class KeyService {
         
         throw new Exception("Erro: nenhuma chave privada encontrada na pasta keys");
     }
+
+    /**
+     * Carrega a chave pública do usuário
+     * @param repositorioPath Caminho do repositório
+     * @return Chave pública
+     * @throws Exception Se houver erro ao carregar a chave pública
+     */
+    public String getMyPublicKey(String repositorioPath) throws Exception {
+        // Lê o arquivo da chave pública
+        byte[] publicKeyBytes = Files.readAllBytes(Paths.get(repositorioPath, ".criptogit", "keys", "public_key.pem"));
+        
+        // Remove headers e footers PEM se existirem
+        String publicKeyContent = new String(publicKeyBytes);
+        publicKeyContent = publicKeyContent.replace("-----BEGIN PUBLIC KEY-----", "")
+                                          .replace("-----END PUBLIC KEY-----", "")
+                                          .replaceAll("\\s", "");
+        return publicKeyContent;
+    }
     
     /**
      * Carrega uma chave privada de um arquivo

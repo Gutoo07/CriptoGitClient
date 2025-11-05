@@ -15,8 +15,6 @@ import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 public class BlobService {
     
@@ -48,10 +46,11 @@ public class BlobService {
      * @param blobs Lista de blobs para enviar
      * @param serverUrl URL do servidor
      * @param repositorioId ID do repositório a ser enviado junto com o ZIP
+     * @param decryptedChallenge Mensagem descriptografada para autenticação
      * @return ResponseEntity com a resposta do servidor
      * @throws Exception se houver erro na requisição
      */
-    public ResponseEntity<String> enviarBlobsEmLote(List<Blob> blobs, String serverUrl, String repositorioId) throws Exception {
+    public ResponseEntity<String> enviarBlobsEmLote(List<Blob> blobs, String serverUrl, String repositorioId, String decryptedMessage, String publicKey) throws Exception {
         // Validações básicas
         if (blobs == null || blobs.isEmpty()) {
             throw new IllegalArgumentException("Lista de blobs não pode ser nula ou vazia");
@@ -95,12 +94,6 @@ public class BlobService {
             } catch (IOException e) {
                 throw new Exception("Erro ao criar arquivo ZIP: " + e.getMessage(), e);
             }
-
-            // Lê o token do arquivo .token
-            String token = Files.readString(Paths.get(".token"));
-            if (token == null || token.isEmpty()) {
-                throw new Exception("Token não encontrado. Faça login para enviar commits.");
-            }
             
             // Obter bytes do ZIP
             byte[] zipBytes = zipOutputStream.toByteArray();
@@ -117,11 +110,11 @@ public class BlobService {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("zip_file", zipResource);
             body.add("repo_id", repositorioId);
-            
+            body.add("decrypted_challenge", decryptedMessage);
             // Preparar headers para multipart/form-data
             HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", publicKey);
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-            headers.set("Authorization", token);
             
             // Criar a entidade HTTP com multipart form data
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);

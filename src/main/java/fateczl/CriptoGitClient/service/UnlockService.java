@@ -41,25 +41,22 @@ public class UnlockService {
         Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
         if (!Files.exists(lockedPath)) {
             Files.createDirectories(lockedPath);
-            System.out.println("Pasta locked criada em: " + lockedPath);
+            System.out.println("Nenhum arquivo criptografado no repositório.");
             return;
         }
         // Cria a pasta unlocked se não existir
         Path unlockedPath = Paths.get(repositorioPath, ".criptogit", "unlocked");
         if (!Files.exists(unlockedPath)) {
             Files.createDirectories(unlockedPath);
-            System.out.println("Pasta unlocked criada em: " + unlockedPath);
         }        
         // Cria a pasta locked/keys se não existir
         Path lockedKeysPath = Paths.get(repositorioPath, ".criptogit", "locked", "keys");
         if (!Files.exists(lockedKeysPath)) {
             Files.createDirectories(lockedKeysPath);
-            System.out.println("Pasta locked/keys criada em: " + lockedKeysPath);
         }        
 
         // Carrega a chave privada do usuário
         PrivateKey privateKey = keyService.loadPrivateKey(repositorioPath);
-        System.out.println("Chave privada carregada com sucesso");       
         
         // Primeira fase: tenta descriptografar com a chave privada
         System.out.println("\n=== FASE 1: Descriptografando com chave privada ===");
@@ -74,8 +71,6 @@ public class UnlockService {
         keyService.clearKeysFolder(lockedPath);
         
         System.out.println("\nProcesso de unlock concluído!");
-        System.out.println("Chaves simétricas obtidas: " + decryptedSymmetricKeys.size());
-        System.out.println("Arquivos processados: " + processedFiles.size());
 
         // Quarta fase: salva o HEAD na pasta .criptogit
         System.out.println("\n=== FASE 4: Salvando HEAD na pasta .criptogit ===");
@@ -127,12 +122,6 @@ public class UnlockService {
                 
                 // Apaga o arquivo criptografado
                 Files.delete(file);
-                
-                System.out.println("✓ Chave simétrica descriptografada: " + file.getFileName());
-                System.out.println("  → Chave salva em: .criptogit/locked/keys/" + (keyCounter - 1));
-                System.out.println("  → Arquivo criptografado removido");
-            } else {
-                System.out.println("✗ Arquivo não é uma chave simétrica: " + file.getFileName());
             }
             
         } catch (Exception e) {
@@ -177,7 +166,7 @@ public class UnlockService {
             return;
         }
         
-        System.out.println("Carregadas " + loadedSymmetricKeys.size() + " chaves simétricas dos arquivos");
+        System.out.println("  Carregadas " + loadedSymmetricKeys.size() + " chaves simétricas dos arquivos");
         
         // Lista apenas os arquivos diretamente dentro da pasta locked que ainda não foram processados
         List<Path> unprocessedFiles = new ArrayList<>();
@@ -249,12 +238,6 @@ public class UnlockService {
             
             processedFiles.add(file.toString());
             
-            System.out.println("✓ Arquivo descriptografado: " + file.getFileName() + " -> " + decryptedFileName);
-            System.out.println("  → Arquivo criptografado removido");
-            
-            // Tenta interpretar o conteúdo descriptografado
-            tryInterpretDecryptedContent(decryptedData, decryptedFileName);
-            
             return true; // Descriptografia bem-sucedida
             
         } catch (Exception e) {
@@ -281,8 +264,6 @@ public class UnlockService {
             
             // Converte os bytes descriptografados para string
             String decryptedFileName = new String(decryptedFileNameBytes);
-            
-            System.out.println("  → Nome descriptografado: " + decryptedFileName);
             return decryptedFileName;
             
         } catch (Exception e) {
@@ -324,7 +305,7 @@ public class UnlockService {
             
             // Verifica se o conteúdo é uma hash SHA-1 de 40 dígitos hexadecimais
             if (content.matches("^[a-f0-9]{40}$")) {
-                System.out.println("  → Detectado como HEAD: versão " + decryptedFileName + ", hash: " + content);
+                System.out.println("    Detectado o HEAD: versão " + decryptedFileName + ", hash: " + content);
                 return true;
             }
             
@@ -357,9 +338,6 @@ public class UnlockService {
         Path headFile = Paths.get(versionsPath.toString(), versionNumber);
         if (!Files.exists(headFile)) {
             Files.write(headFile, decryptedData);
-            System.out.println("  → HEAD salvo em: .criptogit/versions/" + versionNumber);
-        } else {
-            System.out.println("  → HEAD já existe em: .criptogit/versions/" + versionNumber);
         }
         
         // Salva a chave simétrica do HEAD na pasta versions com o nome {versao}.key
@@ -367,9 +345,6 @@ public class UnlockService {
         Path keyFile = Paths.get(versionsPath.toString(), keyFileName);
         if (!Files.exists(keyFile)) {
             Files.write(keyFile, symmetricKey.getEncoded());
-            System.out.println("  → Chave simétrica do HEAD salva em: .criptogit/versions/" + keyFileName);
-        } else {
-            System.out.println("  → Chave simétrica do HEAD já existe, não foi sobrescrita: .criptogit/versions/" + keyFileName);
         }
     }
     
@@ -403,9 +378,6 @@ public class UnlockService {
         Path objectFile = Paths.get(objectDir.toString(), fileName);
         if (!Files.exists(objectFile)) {
             Files.write(objectFile, decryptedData);
-            System.out.println("  → Blob salvo em: .criptogit/objects/" + dirName + "/" + fileName);
-        } else {
-            System.out.println("  → Blob já existe, não foi sobrescrito: .criptogit/objects/" + dirName + "/" + fileName);
         }
         
         // Salva a chave simétrica na mesma pasta do blob com o nome {hash_completa}.key
@@ -413,36 +385,9 @@ public class UnlockService {
         Path keyFile = Paths.get(objectDir.toString(), keyFileName);
         if (!Files.exists(keyFile)) {
             Files.write(keyFile, symmetricKey.getEncoded());
-            System.out.println("  → Chave simétrica salva em: .criptogit/objects/" + dirName + "/" + keyFileName);
-        } else {
-            System.out.println("  → Chave simétrica já existe, não foi sobrescrita: .criptogit/objects/" + dirName + "/" + keyFileName);
         }
     }
-    
-    /**
-     * Tenta interpretar o conteúdo descriptografado para identificar o tipo de objeto
-     * @param decryptedData Dados descriptografados
-     * @param decryptedFileName Nome do arquivo descriptografado
-     */
-    private void tryInterpretDecryptedContent(byte[] decryptedData, String decryptedFileName) {
-        try {
-            String content = new String(decryptedData);
-            
-            if (content.startsWith("tree ")) {
-                System.out.println("  → Tipo: Tree object");
-            } else if (content.startsWith("blob ")) {
-                System.out.println("  → Tipo: Blob object");
-            } else if (content.contains("author ") && content.contains("date ") && content.contains("message ")) {
-                System.out.println("  → Tipo: Commit object");
-            } else {
-                System.out.println("  → Tipo: Conteúdo de arquivo");
-            }
-            
-        } catch (Exception e) {
-            System.out.println("  → Tipo: Dados binários");
-        }
-    }
-    
+
     /**
      * Remonta a árvore de diretórios a partir do arquivo HEAD
      * @param repositorioPath Caminho do repositório
@@ -454,42 +399,37 @@ public class UnlockService {
         Path wdPath = unlockedPath.resolve("wd");
         if (!Files.exists(wdPath)) {
             Files.createDirectories(wdPath);
-            System.out.println("Pasta wd criada em: " + wdPath);
         }
         
         // Lê o arquivo de maior número na pasta versions (HEAD mais recente)
         String commitHash = readLatestHeadFromVersions(repositorioPath);
         if (commitHash == null) {
-            System.err.println("⚠ Nenhum HEAD encontrado na pasta versions");
+            System.err.println(" X Nenhum HEAD encontrado na pasta versions");
             return;
         }
-        
-        System.out.println("Hash do commit HEAD (mais recente): " + commitHash);
         
         // Carrega e processa o commit (agora busca na pasta objects)
         Commit commit = loadCommit(repositorioPath, commitHash);
         if (commit == null) {
-            System.err.println("✗ Erro ao carregar commit: " + commitHash);
+            System.err.println(" X Erro ao carregar commit: " + commitHash);
             return;
         }
         
-        System.out.println("Commit carregado: " + commit.getMessage());
-        System.out.println("Autor: " + commit.getAuthor());
-        System.out.println("Data: " + commit.getDate());
+        System.out.println("   Commit carregado: " + commit.getMessage());
+        System.out.println("   Autor: " + commit.getAuthor());
+        System.out.println("   Data: " + commit.getDate());
         
         // Obtém a tree raiz do commit
         Tree rootTree = commit.getRootTree();
         if (rootTree == null) {
-            System.err.println("✗ Commit não possui tree raiz");
+            System.err.println(" X Commit não possui tree raiz");
             return;
         }
-        
-        System.out.println("Tree raiz: " + rootTree.getHash());
         
         // Processa recursivamente a tree raiz (agora busca na pasta objects)
         processTreeRecursively(repositorioPath, wdPath, rootTree);
         
-        System.out.println("✓ Árvore de diretórios remontada com sucesso em: " + wdPath);
+        System.out.println("  Árvore de diretórios remontada com sucesso em: " + wdPath);
     }
     
     /**
@@ -501,7 +441,7 @@ public class UnlockService {
         try {
             Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
             if (!Files.exists(versionsPath)) {
-                System.out.println("✗ Pasta versions não encontrada");
+                System.out.println(" X Pasta versions não encontrada");
                 return null;
             }
             
@@ -534,34 +474,12 @@ public class UnlockService {
                 System.out.println("HEAD mais recente encontrado: versão " + maxVersion + ", hash: " + latestHeadContent);
                 return latestHeadContent;
             } else {
-                System.out.println("✗ Nenhum arquivo de versão encontrado na pasta versions");
+                System.out.println("X Nenhum arquivo de versão encontrado na pasta versions");
                 return null;
             }
             
         } catch (Exception e) {
-            System.out.println("✗ Erro ao ler pasta versions: " + e.getMessage());
-            return null;
-        }
-    }
-    
-    /**
-     * Lê o arquivo HEAD para obter o hash do commit (método antigo - mantido para compatibilidade)
-     * @param unlockedPath Caminho da pasta unlocked
-     * @return Hash do commit ou null se não encontrado
-     */
-    private String readHeadFile(Path unlockedPath) {
-        try {
-            Path headFile = unlockedPath.resolve("HEAD");
-            if (!Files.exists(headFile)) {
-                return null;
-            }
-            
-            String headContent = Files.readString(headFile).trim();
-            System.out.println("Conteúdo do HEAD: " + headContent);
-            return headContent;
-            
-        } catch (Exception e) {
-            System.out.println("✗ Erro ao ler arquivo HEAD: " + e.getMessage());
+            System.out.println("X Erro ao ler pasta versions: " + e.getMessage());
             return null;
         }
     }
@@ -577,7 +495,7 @@ public class UnlockService {
             // Procura pelo arquivo do commit na pasta objects
             Path commitFile = findObjectFile(repositorioPath, commitHash);
             if (commitFile == null) {
-                System.out.println("✗ Arquivo do commit não encontrado: " + commitHash);
+                System.out.println("X Arquivo do commit não encontrado: " + commitHash);
                 return null;
             }
             
@@ -589,7 +507,7 @@ public class UnlockService {
             return parseCommitContent(commitContent, commitHash, repositorioPath);
             
         } catch (Exception e) {
-            System.out.println("✗ Erro ao carregar commit: " + e.getMessage());
+            System.out.println("X Erro ao carregar commit: " + e.getMessage());
             return null;
         }
     }
@@ -659,7 +577,7 @@ public class UnlockService {
             // Procura pelo arquivo da tree na pasta objects
             Path treeFile = findObjectFile(repositorioPath, treeHash);
             if (treeFile == null) {
-                System.out.println("✗ Arquivo da tree não encontrado: " + treeHash);
+                System.out.println("X Arquivo da tree não encontrado: " + treeHash);
                 return null;
             }
             
@@ -671,7 +589,7 @@ public class UnlockService {
             return parseTreeContent(treeContent, treeHash, repositorioPath);
             
         } catch (Exception e) {
-            System.out.println("✗ Erro ao carregar tree: " + e.getMessage());
+            System.out.println("X Erro ao carregar tree: " + e.getMessage());
             return null;
         }
     }
@@ -733,8 +651,6 @@ public class UnlockService {
      * @throws Exception Se houver erro no processamento
      */
     private void processTreeRecursively(String repositorioPath, Path currentPath, Tree tree) throws Exception {
-        System.out.println("Processando tree: " + tree.getHash() + " em: " + currentPath);
-        
         // Processa todos os arquivos (blobs) desta tree
         for (Arquivo arquivo : tree.getArquivos()) {
             Blob blob = arquivo.getBlob();
@@ -746,9 +662,8 @@ public class UnlockService {
                 // Cria o arquivo
                 Path filePath = currentPath.resolve(fileName);
                 Files.write(filePath, blobContent);
-                System.out.println("  ✓ Arquivo criado: " + fileName);
             } else {
-                System.out.println("  ✗ Erro ao carregar blob: " + blob.getHash());
+                System.out.println("  X Erro ao carregar blob: " + blob.getHash());
             }
         }
         
@@ -759,7 +674,6 @@ public class UnlockService {
             // Cria a pasta
             Path subTreePath = currentPath.resolve(treeName);
             Files.createDirectories(subTreePath);
-            System.out.println("  ✓ Pasta criada: " + treeName);
             
             // Processa recursivamente a sub-tree
             processTreeRecursively(repositorioPath, subTreePath, subTree);
@@ -777,7 +691,7 @@ public class UnlockService {
             // Procura pelo arquivo do blob na pasta objects
             Path blobFile = findObjectFile(repositorioPath, blobHash);
             if (blobFile == null) {
-                System.out.println("✗ Arquivo do blob não encontrado: " + blobHash);
+                System.out.println("X Arquivo do blob não encontrado: " + blobHash);
                 return null;
             }
             
@@ -797,7 +711,7 @@ public class UnlockService {
             return blobData;
             
         } catch (Exception e) {
-            System.out.println("✗ Erro ao carregar blob: " + e.getMessage());
+            System.out.println("X Erro ao carregar blob: " + e.getMessage());
             return null;
         }
     }
@@ -823,13 +737,9 @@ public class UnlockService {
         // Cria a pasta .criptogit se não existir
         if (!Files.exists(criptogitPath)) {
             Files.createDirectories(criptogitPath);
-            System.out.println("Pasta .criptogit criada em: " + criptogitPath);
         }
         
         // Salva o conteúdo do HEAD no arquivo
         Files.write(headFile, latestHeadContent.getBytes());
-        
-        System.out.println("✓ HEAD salvo com sucesso em: " + headFile);
-        System.out.println("  → Conteúdo: " + latestHeadContent);
     }
 }

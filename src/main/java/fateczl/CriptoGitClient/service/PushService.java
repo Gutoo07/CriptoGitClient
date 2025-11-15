@@ -44,7 +44,7 @@ public class PushService {
         System.out.println("\nIniciando autenticação com o servidor...");
         keyService = new KeyService();
         String encryptedChallenge = obterDesafio(repositorioPath, repositorioId, settings);
-        System.out.println(" - Desafio recebido do servidor");
+        System.out.println("  Desafio recebido do servidor");
         
         // Passo 2: Carrega todos os arquivos da pasta locked
         System.out.println("\nCarregando arquivos da pasta locked...");
@@ -61,7 +61,7 @@ public class PushService {
         // Passo 3: Descriptografa a mensagem com a chave privada
         System.out.println("\nDescriptografando mensagem de autenticação...");
         String decryptedMessage = descriptografarDesafio(repositorioPath, encryptedChallenge);
-        System.out.println("✓ Mensagem descriptografada");
+        System.out.println("  Mensagem descriptografada");
         
         // Passo 4: Envia os arquivos junto com a mensagem descriptografada
         System.out.println("\nEnviando arquivos e mensagem de autenticação ao servidor...");
@@ -70,7 +70,7 @@ public class PushService {
         blobService.enviarBlobsEmLote(blobs, settings.getServerUrl() + "/git/push", repositorioId, decryptedMessage, publicKey);
         System.out.println(" *** Push realizado com sucesso ***");
 
-        System.out.println("\nApagando arquivos da pasta locked...");
+        System.out.println("\nApagando arquivos criptografados da pasta locked...");
         try {
             try (var files = Files.list(lockedPath)) {
                 files.filter(Files::isRegularFile)
@@ -82,7 +82,6 @@ public class PushService {
                         }
                     });
             }
-            System.out.println(" *** Arquivos apagados com sucesso ***");
         } catch (IOException e) {
             throw new IOException("Erro ao listar arquivos da pasta locked: " + e.getMessage(), e);
         }

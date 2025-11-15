@@ -141,7 +141,6 @@ public class TreeService {
             // Cria uma nova Tree para o diretório atual
             Tree currentTree = new Tree();               
             currentTree.setName(currentPath.getFileName().toString());
-            System.out.println("Processando diretório: " + currentTree.getName());
             
             // Processa cada arquivo e diretório do diretório atual
             for (Path item : stream.collect(java.util.stream.Collectors.toList())) {
@@ -152,7 +151,6 @@ public class TreeService {
                 
                 if (Files.isDirectory(item)) {
                     // Se é um diretório, processa recursivamente
-                    System.out.println("Processando subdiretório: " + item.getFileName());
                     processDirectoryRecursively(item, objectsPath, md, currentTree);
                 } else if (Files.isRegularFile(item)) {
                     // Se é um arquivo, cria o blob
@@ -180,7 +178,6 @@ public class TreeService {
         // Confere se a pasta da tree existe
         // Se não existir, cria a pasta
         if (!Files.exists(objectDir)) {
-            System.out.println("Criando a pasta: objects/" + objectDir.getFileName().toString());
             Files.createDirectory(objectDir);
         }
     }

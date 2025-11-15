@@ -114,13 +114,12 @@ public class KeyService {
                         if (keyData.length == 32) {
                             SecretKey symmetricKey = new SecretKeySpec(keyData, "AES");
                             loadedKeys.add(symmetricKey);
-                            System.out.println("✓ Chave simétrica carregada: " + keyFile.getFileName());
                         } else {
-                            System.out.println("⚠ Arquivo de chave com tamanho inválido: " + keyFile.getFileName() + " (" + keyData.length + " bytes)");
+                            System.out.println(" X Arquivo de chave com tamanho inválido: " + keyFile.getFileName() + " (" + keyData.length + " bytes)");
                         }
                         
                     } catch (Exception e) {
-                        System.out.println("✗ Erro ao carregar chave: " + keyFile.getFileName() + " - " + e.getMessage());
+                        System.out.println(" X Erro ao carregar chave: " + keyFile.getFileName() + " - " + e.getMessage());
                     }
                 }
             }
@@ -146,23 +145,14 @@ public class KeyService {
         
         // Lista todos os arquivos na pasta keys
         try (var stream = Files.list(keysPath)) {
-            int deletedCount = 0;
             for (Path keyFile : stream.collect(java.util.stream.Collectors.toList())) {
                 if (Files.isRegularFile(keyFile)) {
                     try {
                         Files.delete(keyFile);
-                        deletedCount++;
-                        System.out.println("✓ Arquivo removido: " + keyFile.getFileName());
                     } catch (Exception e) {
-                        System.out.println("✗ Erro ao remover arquivo: " + keyFile.getFileName() + " - " + e.getMessage());
+                        System.out.println(" X Erro ao remover arquivo: " + keyFile.getFileName() + " - " + e.getMessage());
                     }
                 }
-            }
-            
-            if (deletedCount > 0) {
-                System.out.println("Total de arquivos removidos da pasta keys: " + deletedCount);
-            } else {
-                System.out.println("Nenhum arquivo encontrado na pasta keys para remover");
             }
         }
     }

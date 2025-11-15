@@ -67,13 +67,13 @@ public class FileService {
         
         // Se o arquivo não for encontrado, lança uma exceção
         if (filePath == null) {
-            System.out.println("Arquivo não encontrado: " + filename);
+            System.out.println(" X Arquivo não encontrado: " + filename);
             return;
         }
         
         // Se o caminho especificado não for um arquivo, lança uma exceção
         if (!Files.isRegularFile(filePath)) {
-            System.out.println("O caminho especificado não é um arquivo: " + filename);
+            System.out.println(" X O caminho especificado não é um arquivo: " + filename);
             return;
         }
         
@@ -100,7 +100,6 @@ public class FileService {
         Path objectsPath = Paths.get(path, ".criptogit", "objects");
         if (!Files.exists(objectsPath)) {
             // Cria o diretório objects
-            System.out.println("Criando o diretório objects...");
             Files.createDirectory(objectsPath);
         }
         
@@ -170,7 +169,6 @@ public class FileService {
      */
     public Arquivo processFile(Path file, Path objectsPath, MessageDigest md) throws IOException {
         String name = file.getFileName().toString();
-        System.out.println("Criando o object do arquivo: " + name);         
 
         // Pega o conteúdo do arquivo e cria um objeto Blob
         Blob blob = new Blob();
@@ -217,7 +215,6 @@ public class FileService {
         // Confere se o blob do arquivo existe
         // Se não existir, cria o blob
         if (!Files.exists(objectFile)) {
-            System.out.println("Criando o object: " + objectFile.getFileName().toString());
             Files.write(objectFile, blob.getContent());
         }
     }

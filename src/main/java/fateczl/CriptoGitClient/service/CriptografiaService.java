@@ -60,7 +60,6 @@ public class CriptografiaService {
         Path lockedPath = Paths.get(repositorioPath, ".criptogit", "locked");
         if (!Files.exists(lockedPath)) {
             Files.createDirectories(lockedPath);
-            System.out.println("Pasta locked criada em: " + lockedPath);
         }
         
         // Procura o blob do commit
@@ -80,22 +79,16 @@ public class CriptografiaService {
         
         String rootTreeHash = lines[0].substring(5); // Remove "tree " do início
         
-        System.out.println("Iniciando criptografia do commit: " + commitHash);
-        System.out.println("Tree raiz: " + rootTreeHash);
-        
         // Criptografa recursivamente a tree raiz
         String encryptedRootTreeHash = encryptTreeRecursively(rootTreeHash, objectsPath, lockedPath);
         
         // Criptografa o próprio commit
-        String encryptedCommitHash = encryptCommit(commitHash, encryptedRootTreeHash, objectsPath, lockedPath);
-        
-        System.out.println("Criptografia concluída!");
-        System.out.println("Commit original: " + commitHash);
-        System.out.println("Commit criptografado: " + encryptedCommitHash);
-        System.out.println("Arquivos criptografados salvos em: .criptogit/locked");
+        encryptCommit(commitHash, encryptedRootTreeHash, objectsPath, lockedPath);        
         
         // Criptografa o HEAD após criptografar blobs, trees e commits
         encryptHead(repositorioPath, commitHash);
+
+        System.out.println("Criptografia concluída! Arquivos criptografados salvos em: .criptogit/locked");
     }
     
     /**
@@ -139,14 +132,12 @@ public class CriptografiaService {
                 // se aquela linha referenciar um blob
                 if ("blob".equals(type)) {
                     // Criptografa o blob (mas não altera a referência na tree)
-                    String encryptedBlobHash = encryptBlob(hash, objectsPath, lockedPath);
-                    System.out.println("Blob criptografado: " + hash + " -> " + encryptedBlobHash);
+                    encryptBlob(hash, objectsPath, lockedPath);
                     
                 } else if ("tree".equals(type)) {
                     // Se aquela linha referenciar uma tree
                     // Chama recursivamente para processar a sub-tree
-                    String encryptedTreeHash = encryptTreeRecursively(hash, objectsPath, lockedPath);
-                    System.out.println("Tree criptografada: " + hash + " -> " + encryptedTreeHash);
+                    encryptTreeRecursively(hash, objectsPath, lockedPath);
                 }
             }
         }
@@ -179,7 +170,6 @@ public class CriptografiaService {
         
         if (Files.exists(keyPath)) {
             // Blob já foi criptografado, não precisa processar novamente
-            System.out.println("Blob já criptografado, pulando: " + blobHash);
             return blobHash; // Retorna a hash original pois já está criptografado
         }
         
@@ -198,9 +188,6 @@ public class CriptografiaService {
         
         // Salva o blob criptografado e sua chave na mesma pasta do blob original
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedBlobName, keyName, dirName, objectsPath, lockedPath);
-        
-        System.out.println("Blob original: " + blobHash);
-        System.out.println("Blob criptografado salvo em: locked/" + encryptedBlobName);
         
         return newHash;
     }
@@ -221,7 +208,6 @@ public class CriptografiaService {
         
         if (Files.exists(keyPath)) {
             // Tree já foi criptografada, não precisa processar novamente
-            System.out.println("Tree já criptografada, pulando: " + treeHash);
             return treeHash; // Retorna a hash original pois já está criptografada
         }
         
@@ -237,10 +223,6 @@ public class CriptografiaService {
         
         // Salva a tree criptografada e sua chave
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedTreeName, keyName, dirName, objectsPath, lockedPath);
-        
-        System.out.println("Tree original: " + treeHash);
-        System.out.println("Tree criptografada salva em: locked/" + encryptedTreeName.substring(2));
-        System.out.println("Chave simétrica da tree salva em: locked/" + keyName.substring(2));
         
         return newHash;
     }
@@ -269,7 +251,6 @@ public class CriptografiaService {
         
         if (Files.exists(keyPath)) {
             // Commit já foi criptografado, não precisa processar novamente
-            System.out.println("Commit já criptografado, pulando: " + commitHash);
             return commitHash; // Retorna a hash original pois já está criptografado
         }
         
@@ -288,11 +269,7 @@ public class CriptografiaService {
         
         // Salva o commit criptografado e sua chave na mesma pasta do commit original
         String newHash = saveEncryptedBlobWithKey(encryptedContent, secretKey, encryptedCommitName, keyName, dirName, objectsPath, lockedPath);
-        
-        System.out.println("Commit original: " + commitHash);
-        System.out.println("Commit criptografado salvo em: locked/" + encryptedCommitName.substring(2));
-        System.out.println("Chave simétrica do commit salva em: locked/" + keyName.substring(2));
-        
+
         return newHash;
     }
     
@@ -375,7 +352,6 @@ public class CriptografiaService {
                     try {
                         PublicKey publicKey = loadPublicKeyFromFile(keyFile);
                         publicKeys.add(publicKey);
-                        System.out.println("Chave pública carregada: " + fileName);
                     } catch (Exception e) {
                         System.err.println("Erro ao carregar chave pública " + fileName + ": " + e.getMessage());
                     }
@@ -455,7 +431,6 @@ public class CriptografiaService {
         // Salva a chave simétrica original descriptografada na pasta do blob
         Path originalKeyFilePath = Paths.get(objectsPath.toString(), dirName, keyName);
         Files.write(originalKeyFilePath, secretKey.getEncoded());
-        System.out.println("Chave simétrica original salva em: objects/" + dirName + "/" + keyName);
         
         // Criptografa a chave simétrica com cada chave pública RSA
         for (int i = 0; i < publicKeys.size(); i++) {
@@ -468,9 +443,6 @@ public class CriptografiaService {
             // Salva a chave simétrica criptografada
             Path encryptedKeyFilePath = Paths.get(lockedPath.toString(), encryptedKeyName);
             Files.write(encryptedKeyFilePath, encryptedSymmetricKey);
-            
-            System.out.println("Chave simétrica criptografada " + (i + 1) + "/" + publicKeys.size() + 
-                             " salva em: locked/" + encryptedKeyName);
         }
                 
         return encryptedName;
@@ -483,8 +455,6 @@ public class CriptografiaService {
      * @throws Exception Se houver erro na criptografia
      */
     private void encryptHead(String repositorioPath, String commitHash) throws Exception {
-        System.out.println("Iniciando criptografia do HEAD...");
-        
         // Caminho do arquivo HEAD
         Path headPath = Paths.get(repositorioPath, ".criptogit", "HEAD");
         if (!Files.exists(headPath)) {
@@ -493,18 +463,15 @@ public class CriptografiaService {
         
         // Lê o conteúdo do HEAD
         String headContent = new String(Files.readAllBytes(headPath));
-        System.out.println("Conteúdo do HEAD: " + headContent);
         
         // Obtém o número da versão primeiro
         Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
         if (!Files.exists(versionsPath)) {
             Files.createDirectories(versionsPath);
-            System.out.println("Pasta versions criada em: " + versionsPath);
         }
         
         versionService = new VersionService();
         int versionNumber = versionService.findNextVersionNumber(versionsPath);
-        System.out.println("Versão do HEAD: " + versionNumber);
         
         // Gera uma chave simétrica específica para o HEAD
         SecretKey headSecretKey = generateSymmetricKey();
@@ -521,7 +488,6 @@ public class CriptografiaService {
         // Salva o HEAD criptografado na pasta locked
         Path encryptedHeadFilePath = Paths.get(lockedPath.toString(), versionNumber + ".head");
         Files.write(encryptedHeadFilePath, encryptedHeadContent);
-        System.out.println("HEAD criptografado salvo em: locked/" + versionNumber + ".head");
         
         // Criptografa a chave simétrica do HEAD com cada chave pública RSA
         for (int i = 0; i < publicKeys.size(); i++) {
@@ -534,15 +500,10 @@ public class CriptografiaService {
             // Salva a chave simétrica criptografada do HEAD
             Path encryptedHeadKeyFilePath = Paths.get(lockedPath.toString(), encryptedHeadKeyName);
             Files.write(encryptedHeadKeyFilePath, encryptedHeadSymmetricKey);
-            
-            System.out.println("Chave simétrica do HEAD criptografada " + (i + 1) + "/" + publicKeys.size() + 
-                             " salva em: locked/" + encryptedHeadKeyName);
         }
         
         // Salva a chave simétrica original do HEAD na pasta versions
         saveHeadSymmetricKey(repositorioPath, versionNumber, headSecretKey);
-        
-        System.out.println("Criptografia do HEAD concluída!");
     }
     
     /**
@@ -557,7 +518,6 @@ public class CriptografiaService {
         Path versionsPath = Paths.get(repositorioPath, ".criptogit", "versions");
         if (!Files.exists(versionsPath)) {
             Files.createDirectories(versionsPath);
-            System.out.println("Pasta versions criada em: " + versionsPath);
         }
         
         // Nome do arquivo da chave: <versão>.key
@@ -566,8 +526,6 @@ public class CriptografiaService {
         
         // Salva a chave simétrica original do HEAD
         Files.write(headKeyFilePath, headSecretKey.getEncoded());
-        
-        System.out.println("Chave simétrica original do HEAD salva em: versions/" + headKeyFileName + " (versão " + versionNumber + ")");
     }
 
     /**
@@ -643,7 +601,7 @@ public class CriptografiaService {
         
         // Se não existem chaves simétricas, retorna
         if (symmetricKeyFiles.isEmpty()) {
-            System.out.println("Nenhuma chave simétrica encontrada na pasta objects");
+            System.out.println("Nenhuma chave simétrica encontrada na pasta objects.");
             return;
         }
         
@@ -683,9 +641,6 @@ public class CriptografiaService {
                 Files.write(encryptedKeyFilePath, encryptedKeyContent);
                 
                 totalEncrypted++;
-                System.out.println("Chave simétrica criptografada: " + keyFileName + 
-                                 " -> locked/" + encryptedFileName + 
-                                 " (chave pública " + (i + 1) + "/" + newPublicKeys.size() + ")");
             }
         }
         

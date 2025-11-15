@@ -111,8 +111,6 @@ public class CommitService {
         
         // Inicia o processo recursivo a partir da tree raiz
         getLastCommitFilesRecursively(rootTreeHash, "");
-        
-        System.out.println("Index reconstruído com " + index.getBlobs().size() + " arquivos do commit " + parentHash);
     }
     
     /**
@@ -189,9 +187,6 @@ public class CommitService {
                     
                     // Adiciona ao index
                     index.getBlobs().add(blob);
-                    
-                    System.out.println("Blob referenciado: " + relativePath + " (hash: " + hash + ")");
-                    
                 } else if ("tree".equals(type)) {
                     // Se aquela linha referenciar uma tree
                     // Chama recursivamente para processar a sub-tree
@@ -258,7 +253,6 @@ public class CommitService {
         // Cria a pasta versions se não existir
         if (!Files.exists(versionsPath)) {
             Files.createDirectories(versionsPath);
-            System.out.println("Pasta versions criada em: " + versionsPath);
         }
         
         // Procura por arquivos cujos nomes são números (versões)
@@ -268,8 +262,6 @@ public class CommitService {
         // Salva o conteúdo do HEAD no arquivo de versão
         Path versionFile = versionsPath.resolve(String.valueOf(nextVersion));
         Files.write(versionFile, commitHash.getBytes());
-        
-        System.out.println("Versão " + nextVersion + " salva com sucesso em .criptogit/versions/" + nextVersion + ". Hash do commit: " + commitHash);
     }   
 
 }

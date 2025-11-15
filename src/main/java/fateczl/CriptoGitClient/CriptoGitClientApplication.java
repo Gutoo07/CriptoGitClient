@@ -1,11 +1,7 @@
 package fateczl.CriptoGitClient;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import fateczl.CriptoGitClient.service.ConsoleService;
 
-
-@SpringBootApplication
 public class CriptoGitClientApplication {
 
 	public static void main(String[] args) {

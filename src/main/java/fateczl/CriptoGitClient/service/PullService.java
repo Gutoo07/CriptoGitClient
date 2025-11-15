@@ -61,8 +61,8 @@ public class PullService {
         // Obtém o conteúdo do zip
         byte[] zipBytes = response.body();
         
-        // Extrai o zip para .criptogit/clone
-        extractZipToClone(zipBytes, repositorioPath);
+        // Extrai o zip para .criptogit/locked
+        extractZipToLocked(zipBytes, repositorioPath);
         
         System.out.println("Arquivos extraídos com sucesso para .criptogit/clone");
     }
@@ -88,25 +88,25 @@ public class PullService {
     
     
     /**
-     * Extrai um arquivo zip para o diretório .criptogit/clone
+     * Extrai um arquivo zip para o diretório .criptogit/locked
      * @param zipBytes Bytes do arquivo zip
      * @param repositorioPath Caminho do repositório
      * @throws Exception Se houver erro ao extrair o zip
      */
-    private void extractZipToClone(byte[] zipBytes, String repositorioPath) throws Exception {
+    private void extractZipToLocked(byte[] zipBytes, String repositorioPath) throws Exception {
         // Cria o diretório de destino .criptogit/clone
-        Path destDir = Paths.get(repositorioPath, ".criptogit", "clone");
-        Files.createDirectories(destDir);
+        Path lockedDir = Paths.get(repositorioPath, ".criptogit", "locked");
+        Files.createDirectories(lockedDir);
         
         // Extrai o zip
         try (ZipInputStream zipInputStream = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             java.util.zip.ZipEntry entry;
             
             while ((entry = zipInputStream.getNextEntry()) != null) {
-                Path entryPath = destDir.resolve(entry.getName());
+                Path entryPath = lockedDir.resolve(entry.getName());
                 
                 // Previne zip slip attack
-                if (!entryPath.normalize().startsWith(destDir.normalize())) {
+                if (!entryPath.normalize().startsWith(lockedDir.normalize())) {
                     throw new Exception("Entrada inválida no zip: " + entry.getName());
                 }
                 

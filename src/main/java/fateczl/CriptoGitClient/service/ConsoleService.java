@@ -18,6 +18,7 @@ public class ConsoleService {
 
     public void run() {
         String command;
+        System.out.println("\nhelp - Lista todos os comandos disponíveis");
         try {
         do {
             command = readCommand();
@@ -120,14 +121,17 @@ public class ConsoleService {
                 case "list-remote-repositories":
                     repositorioService.listRemoteRepositories(settings);
                     break;
-                case "-help":
+                case "help":
+                    System.out.println();
                     System.out.println("add - Adiciona um arquivo ao repositório local");
+                    System.out.println("allow-new-collaborators - Critografa o repositório com as novas chaves públicas dos novos colaboradores");
                     System.out.println("commit - Cria um commit no repositório local");
                     System.out.println("create-remote-repository - Cria um repositório remoto");
                     System.out.println("clone - Clona um repositório remoto para o repositório local");
                     System.out.println("exit - Sai do programa");
                     System.out.println("init - Inicializa um repositório local");
                     System.out.println("list-remote-repositories - Lista todos os repositórios remotos");
+                    System.out.println("load-public-keys - Recebe as chaves públicas dos colaboradores de um repositório");
                     System.out.println("login - Faz login no servidor");
                     System.out.println("pull - Puxa os commits do repositório remoto para o repositório local");
                     System.out.println("push - Envia os commits do repositório local para o repositório remoto");
@@ -152,7 +156,6 @@ public class ConsoleService {
     }
 
     public String readCommand() {
-        System.out.println("\n-help: Lista todos os comandos disponíveis");
         System.out.print("Digite um comando: ");
         return scanner.nextLine(); 
     }

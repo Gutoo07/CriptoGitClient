@@ -23,7 +23,17 @@ public class LoginService {
             .header("Content-Type", "application/json")
             .build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println(response.body());
+
+        // Converte o JSON para JsonNode (objeto genérico)
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(response.body());
+
+        // Se o cadastro foi bem sucedido
+        if (response.statusCode() >= 200 && response.statusCode() < 400) {
+            System.out.println("\n" + jsonNode.get("mensagem").asText());
+        } else {
+            System.err.println("\n" + jsonNode.get("erro").asText());
+        }  
     }
 
     public void login(String email, String password, Settings settings) throws IOException, InterruptedException {
@@ -37,14 +47,20 @@ public class LoginService {
             .header("Content-Type", "application/json")
             .build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println(response.body());
-        
+
         // Converte o JSON para JsonNode (objeto genérico)
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(response.body());
-        String token = jsonNode.get("token").asText();
-        
-        // Salva o token no arquivo .token
-        Files.writeString(Paths.get(".token"), token);
+
+        // Se o login foi bem sucedido
+        if (response.statusCode() >= 200 && response.statusCode() < 400) {
+            String token = jsonNode.get("token").asText();        
+            
+            // Salva o token no arquivo .token
+            Files.writeString(Paths.get(".token"), token);
+            System.out.println("\n" + jsonNode.get("mensagem").asText());
+        } else {
+            System.err.println("\n" + jsonNode.get("erro").asText());
+        }        
     }
 }

@@ -104,26 +104,28 @@ public class PullService {
             
             while ((entry = zipInputStream.getNextEntry()) != null) {
                 Path entryPath = lockedDir.resolve(entry.getName());
-                
-                // Previne zip slip attack
-                if (!entryPath.normalize().startsWith(lockedDir.normalize())) {
-                    throw new Exception("Entrada inválida no zip: " + entry.getName());
-                }
-                
-                if (entry.isDirectory()) {
-                    // Cria o diretório
-                    Files.createDirectories(entryPath);
-                } else {
-                    // Cria os diretórios pais se necessário
-                    if (entryPath.getParent() != null) {
-                        Files.createDirectories(entryPath.getParent());
+
+                if (!Files.exists(entryPath)) {                
+                    // Previne zip slip attack
+                    if (!entryPath.normalize().startsWith(lockedDir.normalize())) {
+                        throw new Exception("Entrada inválida no zip: " + entry.getName());
                     }
                     
-                    // Escreve o arquivo
-                    Files.copy(zipInputStream, entryPath);
+                    if (entry.isDirectory()) {
+                        // Cria o diretório
+                        Files.createDirectories(entryPath);
+                    } else {
+                        // Cria os diretórios pais se necessário
+                        if (entryPath.getParent() != null) {
+                            Files.createDirectories(entryPath.getParent());
+                        }
+                        
+                        // Escreve o arquivo
+                        Files.copy(zipInputStream, entryPath);
+                    }
+                    
+                    zipInputStream.closeEntry();
                 }
-                
-                zipInputStream.closeEntry();
             }
         }
     }

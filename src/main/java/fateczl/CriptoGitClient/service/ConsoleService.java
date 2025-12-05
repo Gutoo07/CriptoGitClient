@@ -15,6 +15,8 @@ public class ConsoleService {
     CommitService commitService = new CommitService();
     CloneService cloneService = new CloneService();
     Settings settings = new Settings();
+    KeyService keyService = new KeyService();
+    ColaboradorService colaboradorService = new ColaboradorService();
 
     public void run() {
         String command;
@@ -42,6 +44,18 @@ public class ConsoleService {
                     fileService.setRepositorioPath(repositorioService.getRepositorio().getPath());
                     fileService.setIndex(repositorioService.getIndex());
                     fileService.add(filename);
+                    break;
+                case "add-collaborator":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
+                    System.out.print("Digite o email do colaborador: ");
+                    email = scanner.nextLine();
+                    System.out.print("Digite a chave pública do colaborador: ");
+                    String publicKey = scanner.nextLine();
+                    System.out.print("Digite o ID do repositório remoto: ");
+                    repositorioId = scanner.nextLine();
+                    colaboradorService.addCollaborator(email, publicKey, repositorioId, repositorioService.getRepositorio().getPath(), settings);
                     break;
                 case "load-public-keys":
                     if (!checkRepositorioInicializado()) {
@@ -74,6 +88,12 @@ public class ConsoleService {
                     commitService.setRepositorioPath(repositorioService.getRepositorio().getPath());
                     commitService.setIndex(repositorioService.getIndex());
                     commitService.commit(message);
+                    break;
+                case "create-key-pair":
+                    if (!checkRepositorioInicializado()) {
+                        break;
+                    }
+                    keyService.createKeyPair(repositorioService.getRepositorio().getPath());
                     break;
                 case "pull":
                     if (!checkRepositorioInicializado()) {
@@ -126,6 +146,7 @@ public class ConsoleService {
                     System.out.println("add - Adiciona um arquivo ao repositório local");
                     System.out.println("allow-new-collaborators - Critografa o repositório com as novas chaves públicas dos novos colaboradores");
                     System.out.println("commit - Cria um commit no repositório local");
+                    System.out.println("create-key-pair - Cria um par de chaves RSA (private_key.pem e public_key.pem)");
                     System.out.println("create-remote-repository - Cria um repositório remoto");
                     System.out.println("clone - Clona um repositório remoto para o repositório local");
                     System.out.println("exit - Sai do programa");

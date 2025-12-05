@@ -14,6 +14,50 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 public class KeyService {
+    
+    /**
+     * Gera um par de chaves RSA (private_key.pem e public_key.pem)
+     * dentro da pasta .criptogit/keys do repositório informado.
+     *
+     * Requer que o utilitário 'openssl' esteja instalado e disponível no PATH.
+     *
+     * @param repositorioPath Caminho do repositório já inicializado
+     * @throws Exception Se ocorrer erro na criação das chaves
+     */
+    public void createKeyPair(String repositorioPath) throws Exception {
+        // Caminho da pasta .criptogit/keys
+        Path keysPath = Paths.get(repositorioPath, ".criptogit", "keys");
+
+        // Garante que a pasta exista
+        Files.createDirectories(keysPath);
+
+        // Comando 1: openssl genrsa -out private_key.pem 2048
+        ProcessBuilder genPrivateKey = new ProcessBuilder(
+            "openssl", "genrsa", "-out", "private_key.pem", "2048"
+        );
+        genPrivateKey.directory(keysPath.toFile());
+        genPrivateKey.inheritIO(); // encaminha saída/erros para o console atual
+
+        Process process1 = genPrivateKey.start();
+        int exitCode1 = process1.waitFor();
+        if (exitCode1 != 0) {
+            throw new Exception("Falha ao gerar chave privada (openssl genrsa). Código de saída: " + exitCode1);
+        }
+
+        // Comando 2: openssl rsa -in private_key.pem -pubout -out public_key.pem
+        ProcessBuilder genPublicKey = new ProcessBuilder(
+            "openssl", "rsa", "-in", "private_key.pem", "-pubout", "-out", "public_key.pem"
+        );
+        genPublicKey.directory(keysPath.toFile());
+        genPublicKey.inheritIO();
+
+        Process process2 = genPublicKey.start();
+        int exitCode2 = process2.waitFor();
+        if (exitCode2 != 0) {
+            throw new Exception("Falha ao gerar chave pública (openssl rsa). Código de saída: " + exitCode2);
+        }
+    }
+
      /**
      * Carrega a chave privada da pasta keys
      * @param repositorioPath Caminho do repositório
